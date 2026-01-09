@@ -1,0 +1,41 @@
+{
+  "pins" : [
+    {
+      "identity" : "down",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/johnxnguyen/Down",
+      "state" : {
+        "revision" : "f34b166be1f1db4aa8f573067e901d72f2a6be57",
+        "version" : "0.11.0"
+      }
+    },
+    {
+      "identity" : "keyboardshortcuts",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sindresorhus/KeyboardShortcuts",
+      "state" : {
+        "revision" : "f09de800a4f05d66fe2a9924c81a932454a9f39a",
+        "version" : "0.7.1"
+      }
+    },
+    {
+      "identity" : "sparkle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sparkle-project/Sparkle",
+      "state" : {
+        "revision" : "9a1d2a19d3595fcf8d9c447173f9a1687b3dcadb",
+        "version" : "2.8.0"
+      }
+    },
+    {
+      "identity" : "toon-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/toon-format/toon-swift.git",
+      "state" : {
+        "revision" : "2561ea3a337c2fa42c307c0c44fdbad358c7c49c",
+        "version" : "0.3.0"
+      }
+    }
+  ],
+  "version" : 2
+}

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheQuickFox Onboarding</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="onboarding-container">
+        <div class="carousel-wrapper">
+            <div class="carousel" id="carousel">
+                <!-- Panel 1: Welcome -->
+                <div class="panel active" data-panel="1">
+                    <div class="panel-content">
+                        <h1>Welcome to TheQuickFox</h1>
+                        <p class="body-text">You're about to make your life easier in unexpected ways.</p>
+                    </div>
+                </div>
+
+                <!-- Panel 2: Reply Example -->
+                <div class="panel" data-panel="2">
+                    <div class="panel-content">
+                        <h1>Let's say you get a support request:</h1>
+                        <div class="mock-support-app">
+                            <div class="support-header">
+                                <div class="window-controls">
+                                    <span class="window-button close"></span>
+                                    <span class="window-button minimize"></span>
+                                    <span class="window-button maximize"></span>
+                                </div>
+                                <span class="app-name">PretendSupport</span>
+                            </div>
+                            <div class="support-ticket">
+                                <div class="ticket-message">
+                                    <div class="message-author">buzz@killington.com:</div>
+                                    <div class="message-content">Cancel my account</div>
+                                </div>
+                                <div class="reply-section">
+                                    <label for="reply-field">Reply:</label>
+                                    <div class="reply-input-group">
+                                        <textarea id="reply-field" class="reply-textarea" placeholder="Type your reply..."></textarea>
+                                        <button class="submit-arrow" aria-label="Send reply">
+                                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M2 10L17 10M17 10L12 5M17 10L12 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="steps">
+                            <ol>
+                                <li>
+                                    With <em>Reply</em> field focused, press
+                                    <span class="keyboard-shortcut">
+                                        <span class="key-visual">
+                                            <span class="key-symbol">⌃</span>
+                                            <span class="key-text">control</span>
+                                        </span>
+                                        <span class="times-indicator">×2</span>
+                                    </span>
+                                </li>
+                                <li>That activates TheQuickFox. In TheQuickFox reply to the customer (e.g.: "Just cancelled. Feedback?") and press Enter.</li>
+                                <li>TheQuickFox takes your terse response that you'd never send to a customer and makes it <emb>professional</emb>, <em>friendly</em>, or even <em>flirty</em>!</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 3: Feedback Example -->
+                <div class="panel" data-panel="3">
+                    <div class="panel-content">
+                        <h1>Let's say you want feedback on your new logo.</h1>
+                        <div class="mock-logo-app">
+                            <div class="logo-header">
+                                <div class="window-controls">
+                                    <span class="window-button close"></span>
+                                    <span class="window-button minimize"></span>
+                                    <span class="window-button maximize"></span>
+                                </div>
+                                <span class="app-name">Pretend Logo Maker</span>
+                            </div>
+                            <div class="logo-content">
+                                <div class="logo-placeholder">
+                                    <img src="sample-logo.png" alt="Sample Logo" class="logo-image">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="steps">
+                            <ol>
+                                <li>
+                                    Press
+                                    <span class="keyboard-shortcut">
+                                        <span class="key-visual">
+                                            <span class="key-symbol">⌃</span>
+                                            <span class="key-text">control</span>
+                                        </span>
+                                        <span class="times-indicator">×2</span>
+                                    </span>
+                                </li>
+                                <li>When TheQuickFox pops up, type: "Give me feedback on my logo" then press Enter.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 4: Permissions -->
+                <div class="panel" data-panel="4">
+                    <div class="panel-content">
+                        <h1>To work across your apps, TheQuickFox needs these permissions:</h1>
+                        <div class="permissions-list">
+                            <div class="permission-item">
+                                <span class="permission-name">Accessibility</span>
+                                <button class="grant-button" onclick="grantPermission('accessibility')">Grant</button>
+                            </div>
+                            <div class="permission-item">
+                                <span class="permission-name">Screen Recording</span>
+                                <button class="grant-button" onclick="grantPermission('screenRecording')">Grant</button>
+                            </div>
+                        </div>
+
+                        <div class="email-section">
+                            <label for="email-field" class="email-label">Email address</label>
+                            <input type="email" id="email-field" class="email-input" placeholder="you@example.com" oninput="updateEmailValidity()">
+                        </div>
+
+                        <div class="terms-section">
+                            <div class="terms-item">
+                                <input type="checkbox" id="terms-checkbox" class="terms-checkbox" onchange="updateTermsAcceptance()">
+                                <label for="terms-checkbox" class="terms-label">
+                                    I agree to the <a href="https://www.thequickfox.ai/terms.html" onclick="openTermsOfService(event)" target="_blank">Terms of Service</a>
+                                    and <a href="https://www.thequickfox.ai/privacy.html" onclick="openPrivacyPolicy(event)" target="_blank">Privacy Policy</a>.
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="navigation">
+            <button class="nav-button back-button" onclick="navigateBack()" style="display: none;">Back</button>
+            <div class="progress-dots">
+                <span class="dot active" data-panel="1"></span>
+                <span class="dot" data-panel="2"></span>
+                <span class="dot" data-panel="3"></span>
+                <span class="dot" data-panel="4"></span>
+            </div>
+            <button class="nav-button continue-button" onclick="navigateNext()">Continue</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
