@@ -681,7 +681,7 @@ Title:
     private func generateTitleWithOpenAI(prompt: String) async throws -> String {
         // Use proxy endpoint (same as main pipeline)
         let baseURL: String = {
-            #if DEBUG
+            #if LOCAL_API || DEBUG
             return "http://localhost:4003/api/v1"
             #else
             return "https://api.thequickfox.ai/api/v1"

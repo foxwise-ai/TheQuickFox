@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Successful - TheQuickFox</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 60px 40px;
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #4CAF50;
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        .success-icon::after {
+            content: "✓";
+            font-size: 48px;
+            color: white;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        p {
+            font-size: 18px;
+            opacity: 0.9;
+            line-height: 1.6;
+            margin-bottom: 30bit;
+        }
+
+        .loading-text {
+            font-size: 16px;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+
+        .open-app-btn {
+            display: inline-block;
+            background: #fff;
+            color: #2a5298;
+            padding: 16px 32px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            animation: fadeIn 0.5s ease-out 2s forwards;
+        }
+
+        .open-app-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
+        }
+
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error-message {
+            display: none;
+            color: #ffcdd2;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon"></div>
+        <h1>Subscription Activated!</h1>
+        <p>Thank you for subscribing to TheQuickFox. You now have access to the plan features you paid for.</p>
+
+        <p class="loading-text" id="loading-text">Opening TheQuickFox...</p>
+        <div class="spinner" id="spinner"></div>
+
+        <a href="thequickfox://subscription-success" class="open-app-btn" id="open-btn">
+            Open TheQuickFox
+        </a>
+
+        <p class="error-message" id="error-msg">
+            If the app doesn't open automatically, please click the button above or open TheQuickFox manually.
+        </p>
+    </div>
+
+    <script>
+        // Get session ID from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
+
+        // Log for debugging
+        console.log('Session ID:', sessionId);
+
+        // Function to open the app
+        function openApp() {
+            window.location.href = 'thequickfox://subscription-success';
+        }
+
+        // Try to open the app automatically after a short delay
+        setTimeout(() => {
+            console.log('Attempting to open TheQuickFox...');
+            openApp();
+
+            // Hide spinner after attempting to open
+            setTimeout(() => {
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('loading-text').style.display = 'none';
+                document.getElementById('error-msg').style.display = 'block';
+            }, 1000);
+        }, 1500);
+
+        // Manual button click handler
+        document.getElementById('open-btn').addEventListener('click', function(e) {
+            e.preventDefault();
+            openApp();
+        });
+    </script>
+</body>
+</html>

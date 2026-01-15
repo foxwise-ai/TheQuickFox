@@ -9,6 +9,7 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MACOS_SRC_DIR="$PROJECT_ROOT/macos"
 BUILD_CONFIG="release"
 BUILD_UNIVERSAL=false
+BUILD_LOCAL=false
 
 # Change to macos directory for build
 cd "$MACOS_SRC_DIR"
@@ -22,8 +23,17 @@ for arg in "$@"; do
         --universal)
             BUILD_UNIVERSAL=true
             ;;
+        --local)
+            BUILD_LOCAL=true
+            ;;
     esac
 done
+
+# Build flags
+SWIFT_FLAGS=""
+if [ "$BUILD_LOCAL" = true ]; then
+    SWIFT_FLAGS="-Xswiftc -DLOCAL_API"
+fi
 
 BUILD_DIR="$MACOS_SRC_DIR/.build/$BUILD_CONFIG"
 APP_NAME="TheQuickFox"
@@ -55,10 +65,10 @@ echo "⚙️  Building executable..."
 if [ "$BUILD_UNIVERSAL" = true ]; then
     # Build for both architectures
     echo "🔨 Building for Apple Silicon (arm64)..."
-    swift build -c $BUILD_CONFIG --arch arm64
+    swift build -c $BUILD_CONFIG --arch arm64 $SWIFT_FLAGS
 
     echo "🔨 Building for Intel (x86_64)..."
-    swift build -c $BUILD_CONFIG --arch x86_64
+    swift build -c $BUILD_CONFIG --arch x86_64 $SWIFT_FLAGS
 
     # Remove the symlink that Swift creates (points to last-built arch)
     # and create a real directory for the universal build
@@ -74,7 +84,7 @@ if [ "$BUILD_UNIVERSAL" = true ]; then
     echo "✅ Universal binary created!"
     lipo -info "$UNIVERSAL_BINARY"
 else
-    swift build -c $BUILD_CONFIG
+    swift build -c $BUILD_CONFIG $SWIFT_FLAGS
 fi
 
 # Also copy resources to debug build directory for 'swift run'

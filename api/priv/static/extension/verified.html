@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verified - TheQuickFox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #FFF9F5;
+            color: #09213F;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            background: #fff;
+            border-radius: 24px;
+            padding: 50px 40px;
+            text-align: center;
+            max-width: 520px;
+            width: 100%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            border: 1px solid #E9EDF3;
+        }
+
+        .fox-icon {
+            width: 72px;
+            height: 72px;
+            margin-bottom: 16px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            animation: bounce 1s ease-out;
+        }
+
+        .success-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .success-badge::before {
+            content: "\2713";
+            font-weight: bold;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 12px;
+            font-weight: 700;
+            color: #09213F;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: #475569;
+            margin-bottom: 32px;
+        }
+
+        .steps {
+            text-align: left;
+            background: #FFF9F5;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid #E9EDF3;
+        }
+
+        .steps-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #475569;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-number {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #FF7A00 0%, #FFC94C 100%);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .step-content {
+            flex: 1;
+            padding-top: 3px;
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+            color: #09213F;
+        }
+
+        .step-desc {
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.5;
+        }
+
+        .kbd {
+            display: inline-block;
+            background: #fff;
+            border: 1px solid #E9EDF3;
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
+            font-weight: 500;
+            color: #09213F;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .close-note {
+            font-size: 14px;
+            color: #475569;
+        }
+
+        /* Platform-specific shortcuts - hide by default, show via JS */
+        .shortcut-mac,
+        .shortcut-other {
+            display: none;
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="/images/fox-icon.png" alt="TheQuickFox" class="fox-icon">
+        <div class="success-badge">Email Verified</div>
+        <h1>You're all set!</h1>
+        <p class="subtitle">TheQuickFox is ready to use. Here's how to get started:</p>
+
+        <div class="steps">
+            <div class="steps-title">How to use</div>
+
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Go to any webpage</div>
+                    <div class="step-desc">Gmail, LinkedIn, Slack, or any site with text fields</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Press <span class="shortcut-mac"><span class="kbd">Cmd</span>+<span class="kbd">Shift</span>+<span class="kbd">E</span></span><span class="shortcut-other"><span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">E</span></span></div>
+                    <div class="step-desc">Or click the extension icon in your toolbar</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Tell it what to write</div>
+                    <div class="step-desc">Type your intent and watch the AI compose your response</div>
+                </div>
+            </div>
+        </div>
+
+        <p class="close-note">You can close this tab and start using TheQuickFox.</p>
+    </div>
+    <script>
+        // Detect platform and show appropriate shortcut
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const shortcutClass = isMac ? 'shortcut-mac' : 'shortcut-other';
+        document.querySelectorAll('.' + shortcutClass).forEach(el => {
+            el.style.display = 'inline';
+        });
+    </script>
+</body>
+</html>
