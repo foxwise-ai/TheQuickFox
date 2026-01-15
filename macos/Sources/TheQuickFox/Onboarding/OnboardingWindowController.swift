@@ -308,6 +308,11 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Evaluate JavaScript in the webView - used by message handler for callbacks
+    func evaluateJavaScript(_ script: String, completion: ((Any?, Error?) -> Void)? = nil) {
+        webView?.evaluateJavaScript(script, completionHandler: completion)
+    }
+
     func startPermissionStatusTimer() {
         // Stop any existing timer
         permissionStatusTimer?.invalidate()
@@ -605,6 +610,11 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
             case "startPermissionMonitoring":
                 self.windowController?.startPermissionStatusTimer()
 
+            case "composeDemo":
+                if let input = body["input"] as? String,
+                   let tone = body["tone"] as? String {
+                    self.handleComposeDemo(input: input, tone: tone)
+                }
 
             default:
                 print("Unknown onboarding action: \(action)")
@@ -784,5 +794,89 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
         }
 
         print("⚠️ Could not load demo screenshot pretend-logo-maker.png")
+    }
+
+    /// Handle the compose demo request from onboarding
+    /// Calls the actual API and streams the result back to JavaScript
+    private func handleComposeDemo(input: String, tone: String) {
+        print("🎨 Compose demo request - input: '\(input)', tone: \(tone)")
+
+        Task {
+            do {
+                // Map tone string to ResponseTone
+                // Note: "professional" maps to .formal since ResponseTone doesn't have a professional case
+                let responseTone: ResponseTone
+                switch tone {
+                case "friendly":
+                    responseTone = .friendly
+                case "flirty":
+                    responseTone = .flirty
+                default:
+                    // "professional" and "formal" both map to .formal
+                    responseTone = .formal
+                }
+
+                // Create minimal app info for demo
+                let appInfo = ActiveWindowInfo(
+                    bundleID: "com.foxwiseai.thequickfox.onboarding",
+                    appName: "TheQuickFox Onboarding",
+                    windowTitle: "Getting Started",
+                    pid: ProcessInfo.processInfo.processIdentifier
+                )
+
+                // Call the compose API
+                let stream = try await ComposeClient.shared.stream(
+                    mode: .compose,
+                    query: input,
+                    appInfo: appInfo,
+                    contextText: "",
+                    screenshot: nil,
+                    tone: responseTone
+                )
+
+                // Collect all tokens
+                var fullResponse = ""
+                for try await token in stream {
+                    fullResponse += token
+                }
+
+                // Send result back to JavaScript
+                await MainActor.run {
+                    self.sendComposeResult(success: true, text: fullResponse)
+                }
+
+            } catch {
+                print("❌ Compose demo failed: \(error)")
+                await MainActor.run {
+                    self.sendComposeResult(success: false, error: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    /// Send compose result back to JavaScript
+    @MainActor
+    private func sendComposeResult(success: Bool, text: String? = nil, error: String? = nil) {
+        var script: String
+        if success, let text = text {
+            // Escape the text for JavaScript
+            let escapedText = text
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+                .replacingOccurrences(of: "\n", with: "\\n")
+                .replacingOccurrences(of: "\r", with: "\\r")
+            script = "window.handleComposeResult({ success: true, text: \"\(escapedText)\" });"
+        } else {
+            let escapedError = (error ?? "Unknown error")
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+            script = "window.handleComposeResult({ success: false, error: \"\(escapedError)\" });"
+        }
+
+        windowController?.evaluateJavaScript(script) { _, jsError in
+            if let jsError = jsError {
+                print("❌ Failed to send compose result to JS: \(jsError)")
+            }
+        }
     }
 }
