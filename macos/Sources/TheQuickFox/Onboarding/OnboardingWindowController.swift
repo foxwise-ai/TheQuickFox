@@ -31,14 +31,14 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     convenience init() {
         // Create window
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 700),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
 
         window.title = "TheQuickFox"
-        window.minSize = NSSize(width: 660, height: 480)
+        window.minSize = NSSize(width: 720, height: 640)
         window.center()
 
         // Initialize with window
@@ -290,13 +290,25 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: - Permission Status Updates
 
-    private func updatePermissionStatus() {
-        let permissions = PermissionsState.shared.checkAllPermissions()
-        print("🔍 Updating permission status - accessibility: \(permissions.accessibility), screenRecording: \(permissions.screenRecording)")
+    /// Track if we've already checked screen recording to avoid repeated dialogs
+    private var hasCheckedScreenRecording = false
+
+    /// Update permission status in JS - panel-aware to avoid triggering unwanted dialogs
+    /// Panel 3 = Accessibility only, Panel 4 = Screen Recording
+    private func updatePermissionStatus(forPanel panel: Int) {
+        // Only check the permission relevant to the current panel
+        // This avoids triggering the screen recording dialog on Panel 3
+        let accessibilityGranted = PermissionsState.shared.checkAccessibilityPermission()
+
+        // For screen recording, only use cached value to avoid triggering the dialog repeatedly
+        // The actual check happens only when user clicks "Enable" button
+        let screenRecordingGranted = PermissionsState.shared.hasScreenRecordingPermissions
+
+        print("🔍 Updating permission status (panel \(panel)) - accessibility: \(accessibilityGranted), screenRecording: \(screenRecordingGranted)")
         let script = """
             window.updatePermissionStatus({
-                accessibility: \(permissions.accessibility ? "true" : "false"),
-                screenRecording: \(permissions.screenRecording ? "true" : "false")
+                accessibility: \(accessibilityGranted ? "true" : "false"),
+                screenRecording: \(screenRecordingGranted ? "true" : "false")
             });
         """
         webView?.evaluateJavaScript(script) { _, error in
@@ -304,6 +316,47 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
                 print("❌ Failed to update permission status: \(error)")
             } else {
                 print("✅ Permission status updated in JS")
+            }
+        }
+    }
+
+    /// Check screen recording permission once - called after user clicks Enable and returns from System Settings
+    func checkScreenRecordingOnce() {
+        let granted = PermissionsState.shared.checkScreenRecordingPermission()
+        print("🔍 Screen recording check: \(granted)")
+        let script = """
+            window.updatePermissionStatus({
+                accessibility: \(PermissionsState.shared.hasAccessibilityPermissions ? "true" : "false"),
+                screenRecording: \(granted ? "true" : "false")
+            });
+        """
+        webView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    /// Observer for app activation
+    private var screenRecordingObserver: NSObjectProtocol?
+
+    /// Start monitoring for app activation to check screen recording permission
+    func startScreenRecordingMonitor() {
+        // Remove any existing observer
+        if let observer = screenRecordingObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+
+        // Listen for app becoming active
+        screenRecordingObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            print("🔍 App became active - checking screen recording permission")
+            self.checkScreenRecordingOnce()
+
+            // Remove observer after one check
+            if let observer = self.screenRecordingObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self.screenRecordingObserver = nil
             }
         }
     }
@@ -317,21 +370,27 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         // Stop any existing timer
         permissionStatusTimer?.invalidate()
 
-        // Do an initial check immediately when arriving at permissions page
-        updatePermissionStatus()
+        // Get current panel and do initial check
+        webView?.evaluateJavaScript("window.currentPanel") { [weak self] result, _ in
+            guard let self = self else { return }
+            let panel = result as? Int ?? 3
+            self.updatePermissionStatus(forPanel: panel)
+        }
 
-        // Update permission status every second while on permissions page
+        // Update permission status every second while on a permissions page (panel 3 or 4)
         permissionStatusTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
             guard let self = self else {
                 timer.invalidate()
                 return
             }
 
-            // Check if we're still on the permissions page
+            // Check which panel we're on
             self.webView?.evaluateJavaScript("window.currentPanel") { result, error in
-                if let panel = result as? Int, panel == 4 {
-                    self.updatePermissionStatus()
+                if let panel = result as? Int, panel == 3 || panel == 4 {
+                    // Only update for permission panels
+                    self.updatePermissionStatus(forPanel: panel)
                 } else {
+                    // Stop timer when leaving permission panels
                     timer.invalidate()
                     self.permissionStatusTimer = nil
                 }
@@ -497,7 +556,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
                 if self.shouldShowPermissionsError {
                     self.shouldShowPermissionsError = false
                     let script = """
-                        window.navigateToPermissionsWithError('We need screen sharing permissions to work properly.');
+                        window.navigateToPermissionsWithError('Accessibility permission is required for TheQuickFox to work.');
                     """
                     self.webView?.evaluateJavaScript(script) { _, error in
                         if let error = error {
@@ -635,19 +694,12 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
             windowController?.startPermissionStatusTimer()
 
         case "screenRecording":
-            // First, attempt to take a screenshot to trigger the permission prompt
-            // This will make the app appear in the Screen Recording list
-            print("🎯 Attempting screenshot to trigger permission prompt...")
-            ScreenshotManager.shared.requestCapture { result in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // After a short delay, open Screen Recording preferences
-                    // The app should now appear in the list
-                    let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
-                    NSWorkspace.shared.open(url)
-
-                    // Start monitoring for permission changes
-                    self.windowController?.startPermissionStatusTimer()
-                }
+            // Attempt a screenshot to trigger the system permission dialog
+            // The dialog has "Open System Settings" button - user can use that
+            print("🎯 Triggering screen recording permission dialog...")
+            ScreenshotManager.shared.requestCapture { [weak self] _ in
+                // Listen for app becoming active again to check permission
+                self?.windowController?.startScreenRecordingMonitor()
             }
 
         default:
@@ -689,9 +741,11 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
         // Setup the double control detector now that onboarding is complete
         setupDoubleControlDetector()
 
-        // Close the window
-        if let window = NSApp.keyWindow {
-            window.close()
+        // Delay closing to let confetti animation play
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            if let window = NSApp.keyWindow, window.title == "TheQuickFox" {
+                window.close()
+            }
         }
     }
 

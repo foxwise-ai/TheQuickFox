@@ -20,13 +20,6 @@ let selectedTone = 'professional';
 let hasTransformed = false;  // Track if user has tried the transform
 let screenRecordingSkipped = false;
 
-// Demo animation
-let demoTimeout = null;
-const polishedResponses = [
-    "Thank you for reaching out. I've processed your cancellation request and your account has been closed. If there's anything we could have done differently, we'd love to hear your feedback.",
-    "I understand you'd like to cancel. Your subscription has been ended. We're sorry to see you go - if you change your mind, we'll be here.",
-    "Your cancellation is complete. Thanks for being a customer. Feel free to reach out if there's anything we can help with in the future."
-];
 
 // ============================================
 // Initialization
@@ -35,51 +28,9 @@ const polishedResponses = [
 document.addEventListener('DOMContentLoaded', () => {
     setupKeyboardNavigation();
     setupToneChips();
-    startDemoAnimation();
     updateUI();
 });
 
-// ============================================
-// Panel 1: Demo Animation
-// ============================================
-
-function startDemoAnimation() {
-    const polishedEl = document.getElementById('polished-text');
-    if (!polishedEl) return;
-
-    // Pick a random response
-    const response = polishedResponses[Math.floor(Math.random() * polishedResponses.length)];
-
-    // Type out the polished response
-    let charIndex = 0;
-    polishedEl.textContent = '';
-
-    function typeNextChar() {
-        if (charIndex < response.length) {
-            polishedEl.textContent += response[charIndex];
-            charIndex++;
-            demoTimeout = setTimeout(typeNextChar, 25);
-        } else {
-            // After typing completes, wait and restart
-            demoTimeout = setTimeout(() => {
-                polishedEl.style.opacity = '0';
-                setTimeout(() => {
-                    polishedEl.style.opacity = '1';
-                    startDemoAnimation();
-                }, 500);
-            }, 4000);
-        }
-    }
-
-    setTimeout(typeNextChar, 1000);
-}
-
-function stopDemoAnimation() {
-    if (demoTimeout) {
-        clearTimeout(demoTimeout);
-        demoTimeout = null;
-    }
-}
 
 // ============================================
 // Panel 2: Interactive Transform
@@ -124,6 +75,9 @@ async function transformText() {
         winText.style.display = 'block';
         hasTransformed = true;
 
+        // Update button to show "Continue" instead of "Skip"
+        updateContinueButton();
+
         // Track the win
         sendMessage('track', { event: 'onboarding_transform_success', props: { tone: selectedTone } });
 
@@ -139,6 +93,9 @@ async function transformText() {
         outputSection.style.display = 'block';
         winText.style.display = 'block';
         hasTransformed = true;
+
+        // Update button to show "Continue" instead of "Skip"
+        updateContinueButton();
     } finally {
         btn.disabled = false;
         btnText.style.display = 'inline';
@@ -267,12 +224,12 @@ function updateTermsAcceptance() {
 
 function openTermsOfService(event) {
     event.preventDefault();
-    sendMessage('openLink', { url: 'https://www.thequickfox.ai/terms.html' });
+    sendMessage('openLink', { url: 'https://www.thequickfox.ai/terms' });
 }
 
 function openPrivacyPolicy(event) {
     event.preventDefault();
-    sendMessage('openLink', { url: 'https://www.thequickfox.ai/privacy.html' });
+    sendMessage('openLink', { url: 'https://www.thequickfox.ai/privacy/' });
 }
 
 // ============================================
@@ -308,7 +265,7 @@ function canProceed() {
         case 3:
             return permissionsGranted.accessibility;  // Must grant accessibility
         case 4:
-            return permissionsGranted.screenRecording || screenRecordingSkipped;  // Can skip
+            return permissionsGranted.screenRecording;  // Must grant screen recording
         case 5:
             return canComplete();
         default:
@@ -317,7 +274,7 @@ function canProceed() {
 }
 
 function canComplete() {
-    return permissionsGranted.accessibility && termsAccepted && emailValid;
+    return permissionsGranted.accessibility && permissionsGranted.screenRecording && termsAccepted && emailValid;
 }
 
 function updateUI() {
@@ -348,12 +305,6 @@ function updateUI() {
     updateContinueButton();
 
     // Handle panel-specific logic
-    if (currentPanel === 1) {
-        startDemoAnimation();
-    } else {
-        stopDemoAnimation();
-    }
-
     if (currentPanel === 2) {
         // Focus input after transition
         setTimeout(() => {
@@ -386,7 +337,7 @@ function updateContinueButton() {
             break;
         case 4:
             continueButton.textContent = 'Continue';
-            continueButton.disabled = false;  // Can always proceed (skip button also available)
+            continueButton.disabled = !permissionsGranted.screenRecording;  // Must grant screen recording
             break;
         case 5:
             continueButton.textContent = 'Get Started';

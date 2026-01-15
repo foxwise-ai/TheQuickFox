@@ -131,79 +131,58 @@ h1 {
 }
 
 /* ============================================
-   Panel 1: Magic Demo
+   Panel 1: Before/After Demo
    ============================================ */
-.magic-demo {
+.before-after {
     display: flex;
-    flex-direction: column;
     align-items: center;
     gap: 16px;
+    margin-top: 32px;
 }
 
-.demo-label {
-    font-size: 14px;
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-weight: 600;
+.before-box, .after-box {
+    flex: 1;
+    padding: 20px;
+    border-radius: 16px;
+    text-align: left;
 }
 
-.polished-label {
-    margin-top: 8px;
-}
-
-.typed-message {
-    font-size: 18px;
-    padding: 16px 24px;
-    border-radius: 12px;
-    min-height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 300px;
-    text-align: center;
-}
-
-.typed-message.rough {
+.before-box {
     background-color: var(--bg-tertiary);
-    color: var(--text-secondary);
-    font-family: "SF Mono", Menlo, monospace;
+    border: 1px solid var(--border-color);
 }
 
-.typed-message.polished {
+.before-box p {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.after-box {
     background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
     color: white;
-    font-weight: 500;
-    min-height: 80px;
-    padding: 20px 24px;
-    line-height: 1.4;
 }
 
-.transform-arrow {
+.after-box p {
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.box-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.7;
+    margin-bottom: 10px;
+}
+
+.arrow-icon {
+    flex-shrink: 0;
     color: var(--accent-color);
-    animation: bounce 2s infinite;
-}
-
-@keyframes bounce {
-    0%, 20%, 50%, 80%, 100% {
-        transform: translateY(0);
-    }
-    40% {
-        transform: translateY(6px);
-    }
-    60% {
-        transform: translateY(3px);
-    }
-}
-
-/* Typewriter effect */
-@keyframes typewriter {
-    from { width: 0; }
-    to { width: 100%; }
-}
-
-@keyframes blink-caret {
-    50% { border-color: transparent; }
 }
 
 /* ============================================
