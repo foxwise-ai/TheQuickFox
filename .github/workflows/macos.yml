@@ -1,0 +1,266 @@
+name: Release TheQuickFox
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on tags like v1.0.1
+
+jobs:
+  release:
+    # runs-on: macos-latest
+    runs-on: macos-14
+    timeout-minutes: 120  # 2 hour timeout for notarization delays
+    # Only run on version tags
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history to verify branch
+        ref: ${{ github.ref }}  # Explicitly checkout the tag
+
+    - name: Verify tag is on main branch
+      run: |
+        # Get the commit SHA for this tag
+        TAG_COMMIT=$(git rev-list -n 1 ${{ github.ref }})
+
+        # Check if this commit exists on main branch
+        if ! git branch -r --contains $TAG_COMMIT | grep -q "origin/main"; then
+          echo "❌ Error: Tag is not on main branch!"
+          echo "This tag points to commit $TAG_COMMIT which is not on main."
+          echo "Only tags on the main branch can be released."
+          exit 1
+        fi
+
+        echo "✅ Tag is on main branch"
+
+    # - name: Setup Swift
+      # uses: swift-actions/setup-swift@v1
+    - uses: swift-actions/setup-swift@v2
+      with:
+        swift-version: "6.0"
+    - name: Get swift version
+      run: swift --version # Swift 6.0.x
+
+    - name: Install dependencies
+      env:
+        HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        brew install --cask sparkle
+        brew install create-dmg
+
+    - name: Extract version from tag
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Update version in Info.plist
+      run: |
+        /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.VERSION }}" macos/Info.plist
+        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.version.outputs.VERSION }}" macos/Info.plist
+
+    - name: Import code signing certificate
+      env:
+        CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+        CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        # Create variables
+        CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+        KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+        
+        # Decode certificate
+        echo "$CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+        
+        # Create temporary keychain
+        security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+        security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+        
+        # Import certificate to keychain
+        security import $CERTIFICATE_PATH -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+        security list-keychain -d user -s $KEYCHAIN_PATH
+        
+        # Allow codesign to access the keychain
+        security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+        
+        # Extract signing identity
+        SIGNING_IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+        echo "SIGNING_IDENTITY=$SIGNING_IDENTITY" >> $GITHUB_ENV
+        echo "✅ Signing identity: $SIGNING_IDENTITY"
+
+    - name: Configure code signing
+      run: |
+        # Create codesign config for build script
+        mkdir -p scripts/.util
+        cat > scripts/.util/codesign-config.sh <<EOF
+        #!/bin/bash
+        export SIGNING_IDENTITY="$SIGNING_IDENTITY"
+        EOF
+        chmod +x scripts/.util/codesign-config.sh
+
+    - name: Build universal app
+      run: ./scripts/build-app.sh release --universal
+
+    - name: Notarize app bundle
+      env:
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      run: |
+        cd macos/.build/release
+
+        echo "📤 Submitting app for notarization..."
+
+        # Create temporary ZIP for notarization
+        ditto -c -k --keepParent TheQuickFox.app TheQuickFox-temp.zip
+
+        # Submit to notary service (this is the only notarization wait)
+        xcrun notarytool submit TheQuickFox-temp.zip \
+          --apple-id "$APPLE_ID" \
+          --team-id "$APPLE_TEAM_ID" \
+          --password "$APPLE_APP_PASSWORD" \
+          --wait
+
+        # Extract and staple notarization ticket to app
+        rm -rf TheQuickFox.app
+        unzip -q TheQuickFox-temp.zip
+        rm TheQuickFox-temp.zip
+
+        echo "📎 Stapling notarization ticket to app..."
+        xcrun stapler staple TheQuickFox.app
+
+        echo "✅ App notarized and stapled successfully"
+
+    - name: Create final ZIP for Sparkle updates
+      run: |
+        cd macos/.build/release
+
+        # Create ZIP from stapled app
+        ditto -c -k --keepParent TheQuickFox.app TheQuickFox-${{ steps.version.outputs.VERSION }}.zip
+
+        # Store file size for appcast
+        echo "FILE_SIZE=$(stat -f%z TheQuickFox-${{ steps.version.outputs.VERSION }}.zip)" >> $GITHUB_ENV
+
+        echo "✅ Created ZIP with stapled app"
+
+    - name: Generate Sparkle signature
+      run: |
+        cd macos/.build/release
+
+        # Verify ZIP exists
+        if [ ! -f "TheQuickFox-${{ steps.version.outputs.VERSION }}.zip" ]; then
+          echo "❌ ZIP file not found"
+          exit 1
+        fi
+
+        # Save the base64 private key to a file (Sparkle 2.x --ed-key-file expects base64 text)
+        echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" > sparkle_ed_private.txt
+
+        if [ ! -f "sparkle_ed_private.txt" ] || [ ! -s "sparkle_ed_private.txt" ]; then
+          echo "❌ Failed to save private key"
+          exit 1
+        fi
+
+        # Find sign_update in Homebrew Caskroom
+        SIGN_UPDATE=$(find $(brew --prefix)/Caskroom/sparkle -name sign_update -type f | head -n 1)
+
+        if [ -z "$SIGN_UPDATE" ]; then
+          echo "❌ sign_update tool not found"
+          exit 1
+        fi
+
+        echo "Using sign_update: $SIGN_UPDATE"
+
+        # Use --ed-key-file flag (Sparkle 2.x method)
+        set +e
+        SIGN_OUTPUT=$("$SIGN_UPDATE" TheQuickFox-${{ steps.version.outputs.VERSION }}.zip --ed-key-file sparkle_ed_private.txt 2>&1)
+        SIGN_EXIT_CODE=$?
+        set -e
+
+        echo "Sign output: $SIGN_OUTPUT"
+        echo "Sign exit code: $SIGN_EXIT_CODE"
+
+        if [ $SIGN_EXIT_CODE -ne 0 ]; then
+          echo "❌ sign_update command failed with exit code $SIGN_EXIT_CODE"
+          exit 1
+        fi
+
+        SIGNATURE=$(echo "$SIGN_OUTPUT" | grep "sparkle:edSignature" | cut -d'"' -f2)
+
+        if [ -z "$SIGNATURE" ]; then
+          echo "❌ Failed to extract signature"
+          echo "Full output: $SIGN_OUTPUT"
+          exit 1
+        fi
+
+        echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
+        echo "✅ Signature generated successfully: $SIGNATURE"
+
+        # Clean up private key
+        rm -f sparkle_ed_private.txt
+
+    - name: Create DMG for website downloads
+      run: |
+        # Remove existing DMG if present
+        rm -f "TheQuickFox-${{ steps.version.outputs.VERSION }}.dmg"
+
+        # Check for background image
+        BACKGROUND_ARGS=""
+        if [ -f "macos/Resources/dmg-background.png" ]; then
+          BACKGROUND_ARGS="--background macos/Resources/dmg-background.png"
+        fi
+
+        # Create DMG from stapled app (no separate notarization needed)
+        create-dmg \
+          --volname "TheQuickFox" \
+          --volicon "macos/Resources/AppIcon.icns" \
+          --window-pos 200 120 \
+          --window-size 600 415 \
+          --icon-size 72 \
+          --icon "TheQuickFox.app" 322 287 \
+          --hide-extension "TheQuickFox.app" \
+          --app-drop-link 495 287 \
+          --text-size 14 \
+          --hdiutil-verbose \
+          --no-internet-enable \
+          ${BACKGROUND_ARGS} \
+          "TheQuickFox-${{ steps.version.outputs.VERSION }}.dmg" \
+          "macos/.build/release/TheQuickFox.app"
+
+        # Create a copy as -latest.dmg for stable download URL
+        cp "TheQuickFox-${{ steps.version.outputs.VERSION }}.dmg" "TheQuickFox-latest.dmg"
+
+        echo "✅ Created DMG with stapled app (no separate notarization needed)"
+
+    - name: Extract tag message for release notes
+      id: tag_message
+      env:
+        COMMIT_MSG: ${{ github.event.head_commit.message }}
+      run: |
+        # Get the tag annotation if it exists, otherwise use commit message
+        TAG_MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
+        if [ -z "$TAG_MESSAGE" ]; then
+          TAG_MESSAGE="$COMMIT_MSG"
+        fi
+        # Export as multiline string
+        echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+        echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Upload to GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          macos/.build/release/TheQuickFox-${{ steps.version.outputs.VERSION }}.zip
+          TheQuickFox-${{ steps.version.outputs.VERSION }}.dmg
+        body: ${{ steps.tag_message.outputs.RELEASE_NOTES }}
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.VERSION, 'beta') }}
+
+    - name: Create release record in database
+      env:
+        VERSION: ${{ steps.version.outputs.VERSION }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+        RELEASE_NOTES: ${{ steps.tag_message.outputs.RELEASE_NOTES }}
+      run: python3 scripts/create_release.py
