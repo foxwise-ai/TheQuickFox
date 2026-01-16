@@ -200,6 +200,12 @@ function skipScreenRecording() {
     navigateNext();
 }
 
+function skipToPermissions() {
+    currentPanel = 3;
+    updateUI();
+    sendMessage('track', { event: 'skipped_to_permissions' });
+}
+
 // ============================================
 // Email & Terms Validation
 // ============================================
@@ -301,6 +307,12 @@ function updateUI() {
 
     // Show/hide back button
     backButton.style.visibility = currentPanel === 1 ? 'hidden' : 'visible';
+
+    // Show/hide skip button (only on Panel 2)
+    const skipButton = document.getElementById('skip-btn');
+    if (skipButton) {
+        skipButton.style.display = currentPanel === 2 ? 'block' : 'none';
+    }
 
     updateContinueButton();
 

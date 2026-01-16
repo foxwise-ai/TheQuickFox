@@ -103,35 +103,14 @@
                                             </div>
                 </div>
 
-                <!-- Panel 4: Screen Context (Optional) -->
+                <!-- Panel 4: Screen Context -->
                 <div class="panel" data-panel="4">
                     <div class="panel-content">
-                        <div class="feature-preview">
-                            <div class="feature-icon">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-                                    <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
-                                    <path d="M8 21H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                    <path d="M12 17V21" stroke="currentColor" stroke-width="2"/>
-                                    <circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </div>
-                            <h1>Context-aware AI</h1>
-                            <p class="subtitle">TheQuickFox can see your screen to give smarter answers.</p>
-                        </div>
+                        <h1>Context-aware AI</h1>
+                        <p class="subtitle">TheQuickFox can see your screen to give smarter answers.</p>
 
-                        <div class="examples-list">
-                            <div class="example-item">
-                                <span class="example-icon">Q</span>
-                                <span>"What's wrong with this code?"</span>
-                            </div>
-                            <div class="example-item">
-                                <span class="example-icon">Q</span>
-                                <span>"Summarize this article"</span>
-                            </div>
-                            <div class="example-item">
-                                <span class="example-icon">Q</span>
-                                <span>"Give feedback on this design"</span>
-                            </div>
+                        <div class="permission-demo-gif">
+                            <img src="screen-permissions.gif" alt="How to enable screen recording">
                         </div>
 
                         <div class="permission-card" id="screen-card">
@@ -195,7 +174,10 @@
                 <span class="dot" data-panel="4"></span>
                 <span class="dot" data-panel="5"></span>
             </div>
-            <button class="nav-button continue-button" id="continue-btn" onclick="navigateNext()">Try It</button>
+            <div class="nav-right">
+                <button class="nav-button skip-button" id="skip-btn" onclick="skipToPermissions()" style="display: none;">Skip</button>
+                <button class="nav-button continue-button" id="continue-btn" onclick="navigateNext()">Try It</button>
+            </div>
         </div>
     </div>
 

@@ -578,6 +578,19 @@ h1 {
     font-weight: 700;
 }
 
+.permission-demo-gif {
+    margin: 24px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.permission-demo-gif img {
+    width: 100%;
+    display: block;
+}
+
+
 .skip-btn {
     display: block;
     width: 100%;
@@ -742,6 +755,21 @@ h1 {
 .back-button:hover {
     background-color: var(--bg-tertiary);
     border-color: var(--text-secondary);
+}
+
+.nav-right {
+    display: flex;
+    gap: 12px;
+}
+
+.skip-button {
+    background-color: transparent;
+    color: var(--text-secondary);
+    border: 1.5px solid var(--border-color);
+}
+
+.skip-button:hover {
+    background-color: var(--bg-tertiary);
 }
 
 .continue-button {
