@@ -12,26 +12,6 @@ MACOS_DIR="$PROJECT_ROOT/macos"
 BUILD_CONFIG="release"
 UNIVERSAL=false
 
-# Parse arguments
-for arg in "$@"; do
-    case $arg in
-        debug|release)
-            BUILD_CONFIG="$arg"
-            ;;
-        --universal)
-            UNIVERSAL=true
-            ;;
-    esac
-done
-
-if [ "$UNIVERSAL" = true ]; then
-    echo "🔨 Building Universal TheQuickFox ($BUILD_CONFIG)..."
-    "$SCRIPT_DIR/build-app.sh" $BUILD_CONFIG --universal
-else
-    echo "🔨 Building TheQuickFox ($BUILD_CONFIG)..."
-    "$SCRIPT_DIR/build-app.sh" $BUILD_CONFIG
-fi
-
 echo "🗑️  Removing old installation..."
 rm -rf ~/Applications/TheQuickFox.app
 

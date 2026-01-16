@@ -8,6 +8,13 @@
 import Cocoa
 import Combine
 
+// MARK: - Notification Names
+
+extension NSNotification.Name {
+    /// Posted when the HUD appears on screen
+    static let hudDidAppear = NSNotification.Name("com.foxwiseai.thequickfox.hudDidAppear")
+}
+
 /// HUD manager that coordinates between the AppStore and UI
 @MainActor
 final class HUDManager: ObservableObject {
@@ -36,7 +43,7 @@ final class HUDManager: ObservableObject {
 
     // MARK: - Public Interface
 
-    func presentHUD(initialMode: HUDMode = .compose, demoPageContext: String? = nil) {
+    func presentHUD(initialMode: HUDMode = .ask, demoPageContext: String? = nil) {
         // Check if we can restore an existing session
         if store.sessionState.canRestore && demoPageContext == nil {
             // Resume existing session - restore session state and show immediately without animation
@@ -92,20 +99,6 @@ final class HUDManager: ObservableObject {
         }
     }
 
-    // MARK: - Direct UI Interface (for effects handler)
-
-    func showUI() {
-        // Direct UI call - no action dispatch to avoid loops
-        if !store.hudState.isVisible {
-            hudViewController.presentHUD()
-        }
-    }
-
-    func hideUI() {
-        // Direct UI call - no action dispatch
-        hudViewController.hideHUD()
-    }
-    
     func getCurrentWindowFrame() -> NSRect? {
         return hudViewController.getWindowFrame()
     }

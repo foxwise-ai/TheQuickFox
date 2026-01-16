@@ -23,6 +23,9 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private let headerHeight: CGFloat = 70
     private var shouldShowPermissionsError = false
     private var shouldShowTOSError = false
+    private var isCompletionMode = false
+    private var hudAppearedBeforeWebViewLoaded = false  // Track if HUD appeared before completion.html loaded
+    private var completionWebViewReady = false  // Track if completion.html JS is ready
     var permissionStatusTimer: Timer?
 
 
@@ -31,14 +34,14 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     convenience init() {
         // Create window
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 700),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
 
         window.title = "TheQuickFox"
-        window.minSize = NSSize(width: 660, height: 480)
+        window.minSize = NSSize(width: 720, height: 640)
         window.center()
 
         // Initialize with window
@@ -68,7 +71,11 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         // Clean up timer when window is about to close
         permissionStatusTimer?.invalidate()
         permissionStatusTimer = nil
-        print("🧹 Window closing - timer cleaned up")
+
+        // Remove HUD notification observer
+        NotificationCenter.default.removeObserver(self, name: .hudDidAppear, object: nil)
+
+        print("🧹 Window closing - timer and observers cleaned up")
     }
 
     // MARK: - Setup
@@ -288,15 +295,181 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Show the completion screen after app restart (post screen recording permission)
+    func showCompletionMode() {
+        isCompletionMode = true
+
+        // Change window title so HUD can still open (main.swift checks for "TheQuickFox" title)
+        window?.title = "TheQuickFox - Ready"
+
+        // Load completion.html instead of index.html
+        loadCompletionContent()
+
+        // Listen for HUD appearing
+        print("👀 Adding hudDidAppear observer")
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHUDAppeared),
+            name: .hudDidAppear,
+            object: nil
+        )
+
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func handleHUDAppeared() {
+        print("🎉 HUD appeared - notifying completion screen (webViewReady: \(completionWebViewReady))")
+
+        // If webView isn't ready yet, store the flag and notify later
+        guard completionWebViewReady else {
+            print("⏳ WebView not ready yet, storing flag for later")
+            hudAppearedBeforeWebViewLoaded = true
+            return
+        }
+
+        notifyJSOfHUDAppearance()
+    }
+
+    private func notifyJSOfHUDAppearance() {
+        // Call JS to transition to success state (HUD stays open for user to explore)
+        let script = """
+            if (typeof window.onHUDAppeared === 'function') {
+                window.onHUDAppeared();
+                'success';
+            } else {
+                'function not found';
+            }
+        """
+        self.webView?.evaluateJavaScript(script) { result, error in
+            if let error = error {
+                print("❌ Failed to notify JS of HUD appearance: \(error)")
+            } else {
+                print("✅ JS result: \(result ?? "nil")")
+            }
+        }
+    }
+
+    private func loadCompletionContent() {
+        let fileManager = FileManager.default
+        var htmlURL: URL?
+        var baseURL: URL?
+
+        print("🔄 Loading completion content...")
+
+        let possiblePaths = [
+            Bundle.main.resourceURL?.appendingPathComponent("Onboarding/completion.html"),
+            Bundle.main.bundleURL.deletingLastPathComponent()
+                .appendingPathComponent("TheQuickFox_TheQuickFox.resources/Onboarding/completion.html"),
+            URL(fileURLWithPath: fileManager.currentDirectoryPath)
+                .appendingPathComponent("Sources/TheQuickFox/Onboarding/Resources/completion.html"),
+        ]
+
+        for path in possiblePaths.compactMap({ $0 }) {
+            print("🔍 Checking path: \(path.path)")
+            if fileManager.fileExists(atPath: path.path) {
+                htmlURL = path
+                baseURL = path.deletingLastPathComponent()
+                print("✅ Found completion HTML at: \(path.path)")
+                break
+            }
+        }
+
+        guard let finalURL = htmlURL, let finalBaseURL = baseURL else {
+            print("❌ Could not find completion HTML file")
+            return
+        }
+
+        webView.loadFileURL(finalURL, allowingReadAccessTo: finalBaseURL)
+    }
+
+    /// Show completion content immediately without header animation
+    private func showCompletionContent() {
+        print("🎉 Showing completion content")
+
+        // Hide the loading view
+        loadingView.isHidden = true
+
+        // Expand web view to fill the container (no header needed)
+        webView.frame = containerView.bounds
+        webView.alphaValue = 1
+
+        // Pass running apps to the web view
+        injectRunningApps()
+
+        // Mark webView as ready for JS calls
+        completionWebViewReady = true
+
+        // If HUD appeared before webView was ready, notify now
+        if hudAppearedBeforeWebViewLoaded {
+            print("🔔 HUD appeared earlier - notifying JS now")
+            hudAppearedBeforeWebViewLoaded = false
+            notifyJSOfHUDAppearance()
+        }
+    }
+
+    /// Get running apps and inject them into the completion page
+    private func injectRunningApps() {
+        var appsData: [[String: String]] = []
+
+        // Get running applications, filter to regular apps
+        let runningApps = NSWorkspace.shared.runningApplications.filter { app in
+            app.activationPolicy == .regular &&
+            app.bundleIdentifier != Bundle.main.bundleIdentifier &&
+            app.localizedName != nil
+        }
+
+        // Take first 5 apps
+        for app in runningApps.prefix(5) {
+            guard let name = app.localizedName,
+                  let icon = app.icon else { continue }
+
+            // Convert icon to base64
+            if let tiffData = icon.tiffRepresentation,
+               let bitmapRep = NSBitmapImageRep(data: tiffData),
+               let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+                let base64 = pngData.base64EncodedString()
+                appsData.append([
+                    "name": name,
+                    "icon": "data:image/png;base64,\(base64)"
+                ])
+            }
+        }
+
+        // Inject into JavaScript
+        if let jsonData = try? JSONSerialization.data(withJSONObject: appsData),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            let script = "window.setRunningApps(\(jsonString));"
+            webView?.evaluateJavaScript(script) { _, error in
+                if let error = error {
+                    print("❌ Failed to inject running apps: \(error)")
+                } else {
+                    print("✅ Injected \(appsData.count) running apps")
+                }
+            }
+        }
+    }
+
     // MARK: - Permission Status Updates
 
-    private func updatePermissionStatus() {
-        let permissions = PermissionsState.shared.checkAllPermissions()
-        print("🔍 Updating permission status - accessibility: \(permissions.accessibility), screenRecording: \(permissions.screenRecording)")
+    /// Track if we've already checked screen recording to avoid repeated dialogs
+    private var hasCheckedScreenRecording = false
+
+    /// Update permission status in JS - panel-aware to avoid triggering unwanted dialogs
+    /// Panel 3 = Accessibility, Panel 4 = Email/TOS (no permissions), Panel 5 = Screen Recording
+    private func updatePermissionStatus(forPanel panel: Int) {
+        // Only check the permission relevant to the current panel
+        let accessibilityGranted = PermissionsState.shared.checkAccessibilityPermission()
+
+        // For screen recording, only use cached value to avoid triggering the dialog repeatedly
+        // The actual check happens only when user clicks "Enable" button
+        let screenRecordingGranted = PermissionsState.shared.hasScreenRecordingPermissions
+
+        print("🔍 Updating permission status (panel \(panel)) - accessibility: \(accessibilityGranted), screenRecording: \(screenRecordingGranted)")
         let script = """
             window.updatePermissionStatus({
-                accessibility: \(permissions.accessibility ? "true" : "false"),
-                screenRecording: \(permissions.screenRecording ? "true" : "false")
+                accessibility: \(accessibilityGranted ? "true" : "false"),
+                screenRecording: \(screenRecordingGranted ? "true" : "false")
             });
         """
         webView?.evaluateJavaScript(script) { _, error in
@@ -308,25 +481,77 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Check screen recording permission once - called after user clicks Enable and returns from System Settings
+    func checkScreenRecordingOnce() {
+        let granted = PermissionsState.shared.checkScreenRecordingPermission()
+        print("🔍 Screen recording check: \(granted)")
+        let script = """
+            window.updatePermissionStatus({
+                accessibility: \(PermissionsState.shared.hasAccessibilityPermissions ? "true" : "false"),
+                screenRecording: \(granted ? "true" : "false")
+            });
+        """
+        webView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    /// Observer for app activation
+    private var screenRecordingObserver: NSObjectProtocol?
+
+    /// Start monitoring for app activation to check screen recording permission
+    func startScreenRecordingMonitor() {
+        // Remove any existing observer
+        if let observer = screenRecordingObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+
+        // Listen for app becoming active
+        screenRecordingObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            print("🔍 App became active - checking screen recording permission")
+            self.checkScreenRecordingOnce()
+
+            // Remove observer after one check
+            if let observer = self.screenRecordingObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self.screenRecordingObserver = nil
+            }
+        }
+    }
+
+    /// Evaluate JavaScript in the webView - used by message handler for callbacks
+    func evaluateJavaScript(_ script: String, completion: ((Any?, Error?) -> Void)? = nil) {
+        webView?.evaluateJavaScript(script, completionHandler: completion)
+    }
+
     func startPermissionStatusTimer() {
         // Stop any existing timer
         permissionStatusTimer?.invalidate()
 
-        // Do an initial check immediately when arriving at permissions page
-        updatePermissionStatus()
+        // Get current panel and do initial check
+        webView?.evaluateJavaScript("window.currentPanel") { [weak self] result, _ in
+            guard let self = self else { return }
+            let panel = result as? Int ?? 3
+            self.updatePermissionStatus(forPanel: panel)
+        }
 
-        // Update permission status every second while on permissions page
+        // Update permission status every second while on a permissions page (panel 3 or 5)
         permissionStatusTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
             guard let self = self else {
                 timer.invalidate()
                 return
             }
 
-            // Check if we're still on the permissions page
+            // Check which panel we're on
             self.webView?.evaluateJavaScript("window.currentPanel") { result, error in
-                if let panel = result as? Int, panel == 4 {
-                    self.updatePermissionStatus()
+                if let panel = result as? Int, panel == 3 || panel == 5 {
+                    // Only update for permission panels (3 = Accessibility, 5 = Screen Recording)
+                    self.updatePermissionStatus(forPanel: panel)
                 } else {
+                    // Stop timer when leaving permission panels
                     timer.invalidate()
                     self.permissionStatusTimer = nil
                 }
@@ -492,7 +717,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
                 if self.shouldShowPermissionsError {
                     self.shouldShowPermissionsError = false
                     let script = """
-                        window.navigateToPermissionsWithError('We need screen sharing permissions to work properly.');
+                        window.navigateToPermissionsWithError('Accessibility permission is required for TheQuickFox to work.');
                     """
                     self.webView?.evaluateJavaScript(script) { _, error in
                         if let error = error {
@@ -532,6 +757,14 @@ extension OnboardingWindowController: WKNavigationDelegate {
         let isDarkMode = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let script = "window.setSystemAppearance('\(isDarkMode ? "dark" : "light")')"
         webView.evaluateJavaScript(script)
+
+        // For completion mode, just show the content immediately (no header animation)
+        if isCompletionMode {
+            DispatchQueue.main.async { [weak self] in
+                self?.showCompletionContent()
+            }
+            return
+        }
 
         // Don't check permissions on initial load - wait until user reaches permissions page
         // Just set initial state to false
@@ -605,6 +838,21 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
             case "startPermissionMonitoring":
                 self.windowController?.startPermissionStatusTimer()
 
+            case "composeDemo":
+                if let input = body["input"] as? String,
+                   let tone = body["tone"] as? String {
+                    self.handleComposeDemo(input: input, tone: tone)
+                }
+
+            case "closeWindow":
+                self.windowController?.window?.close()
+                // Activate a non-Finder app (Finder causes issues)
+                self.activateNonFinderApp()
+
+            case "saveOnboardingProgress":
+                // Save onboarding progress early (before screen recording which may restart app)
+                let email = body["email"] as? String
+                self.handleSaveOnboardingProgress(email: email)
 
             default:
                 print("Unknown onboarding action: \(action)")
@@ -625,19 +873,12 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
             windowController?.startPermissionStatusTimer()
 
         case "screenRecording":
-            // First, attempt to take a screenshot to trigger the permission prompt
-            // This will make the app appear in the Screen Recording list
-            print("🎯 Attempting screenshot to trigger permission prompt...")
-            ScreenshotManager.shared.requestCapture { result in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // After a short delay, open Screen Recording preferences
-                    // The app should now appear in the list
-                    let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
-                    NSWorkspace.shared.open(url)
-
-                    // Start monitoring for permission changes
-                    self.windowController?.startPermissionStatusTimer()
-                }
+            // Attempt a screenshot to trigger the system permission dialog
+            // The dialog has "Open System Settings" button - user can use that
+            print("🎯 Triggering screen recording permission dialog...")
+            ScreenshotManager.shared.requestCapture { [weak self] _ in
+                // Listen for app becoming active again to check permission
+                self?.windowController?.startScreenRecordingMonitor()
             }
 
         default:
@@ -651,10 +892,12 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
         }
     }
 
-    private func handleCompleteOnboarding(email: String?) {
-        print("✅ Onboarding completed - accepting terms with email: \(email ?? "none")")
+    /// Save onboarding progress early - called when user completes email/TOS step
+    /// This ensures the flag is set before screen recording permission (which may restart the app)
+    private func handleSaveOnboardingProgress(email: String?) {
+        print("💾 Saving onboarding progress - email: \(email ?? "none")")
 
-        // Accept terms of service when onboarding completes
+        // Accept terms of service
         if let email = email, !email.isEmpty {
             Task {
                 do {
@@ -662,15 +905,30 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
                     print("✅ Terms of service accepted for email: \(email)")
                 } catch {
                     print("❌ Failed to accept terms: \(error)")
-                    // Continue anyway since onboarding is complete
                 }
             }
-        } else {
-            print("⚠️ No email provided during onboarding")
         }
 
-        // Mark onboarding as completed
+        // Mark onboarding as completed EARLY (before screen recording step)
         UserDefaults.standard.set(true, forKey: "com.foxwiseai.thequickfox.onboardingCompleted")
+
+        // Set flag to show completion screen after potential restart
+        UserDefaults.standard.set(true, forKey: "com.foxwiseai.thequickfox.needsPostRestartScreen")
+
+        UserDefaults.standard.synchronize() // Force immediate write to disk
+
+        print("✅ Onboarding progress saved to UserDefaults (with post-restart flag)")
+    }
+
+    private func handleCompleteOnboarding(email: String?) {
+        print("✅ Onboarding completed")
+
+        // Onboarding flag should already be set by saveOnboardingProgress
+        // But set it again just in case
+        UserDefaults.standard.set(true, forKey: "com.foxwiseai.thequickfox.onboardingCompleted")
+
+        // Clear the post-restart flag since we completed normally
+        UserDefaults.standard.set(false, forKey: "com.foxwiseai.thequickfox.needsPostRestartScreen")
 
         // Stop the permission status timer
         windowController?.permissionStatusTimer?.invalidate()
@@ -679,8 +937,11 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
         // Setup the double control detector now that onboarding is complete
         setupDoubleControlDetector()
 
-        // Close the window
-        if let window = NSApp.keyWindow {
+        // Window stays open - user closes it manually via the Close button
+    }
+
+    private func handleCloseWindow() {
+        if let window = NSApp.keyWindow, window.title == "TheQuickFox" {
             window.close()
         }
     }
@@ -784,5 +1045,109 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
         }
 
         print("⚠️ Could not load demo screenshot pretend-logo-maker.png")
+    }
+
+    /// Handle the compose demo request from onboarding
+    /// Calls the actual API and streams the result back to JavaScript
+    private func handleComposeDemo(input: String, tone: String) {
+        print("🎨 Compose demo request - input: '\(input)', tone: \(tone)")
+
+        Task {
+            do {
+                // Map tone string to ResponseTone
+                // Note: "professional" maps to .formal since ResponseTone doesn't have a professional case
+                let responseTone: ResponseTone
+                switch tone {
+                case "friendly":
+                    responseTone = .friendly
+                case "flirty":
+                    responseTone = .flirty
+                default:
+                    // "professional" and "formal" both map to .formal
+                    responseTone = .formal
+                }
+
+                // Create minimal app info for demo
+                let appInfo = ActiveWindowInfo(
+                    bundleID: "com.foxwiseai.thequickfox.onboarding",
+                    appName: "TheQuickFox Onboarding",
+                    windowTitle: "Getting Started",
+                    pid: ProcessInfo.processInfo.processIdentifier
+                )
+
+                // Call the compose API
+                let stream = try await ComposeClient.shared.stream(
+                    mode: .compose,
+                    query: input,
+                    appInfo: appInfo,
+                    contextText: "",
+                    screenshot: nil,
+                    tone: responseTone
+                )
+
+                // Collect all tokens
+                var fullResponse = ""
+                for try await token in stream {
+                    fullResponse += token
+                }
+
+                // Send result back to JavaScript
+                await MainActor.run {
+                    self.sendComposeResult(success: true, text: fullResponse)
+                }
+
+            } catch {
+                print("❌ Compose demo failed: \(error)")
+                await MainActor.run {
+                    self.sendComposeResult(success: false, error: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    /// Send compose result back to JavaScript
+    @MainActor
+    private func sendComposeResult(success: Bool, text: String? = nil, error: String? = nil) {
+        var script: String
+        if success, let text = text {
+            // Escape the text for JavaScript
+            let escapedText = text
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+                .replacingOccurrences(of: "\n", with: "\\n")
+                .replacingOccurrences(of: "\r", with: "\\r")
+            script = "window.handleComposeResult({ success: true, text: \"\(escapedText)\" });"
+        } else {
+            let escapedError = (error ?? "Unknown error")
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+            script = "window.handleComposeResult({ success: false, error: \"\(escapedError)\" });"
+        }
+
+        windowController?.evaluateJavaScript(script) { _, jsError in
+            if let jsError = jsError {
+                print("❌ Failed to send compose result to JS: \(jsError)")
+            }
+        }
+    }
+
+    /// Activate a non-Finder app after closing onboarding (Finder causes issues)
+    private func activateNonFinderApp() {
+        // Find a running app that isn't Finder and isn't our app
+        let runningApps = NSWorkspace.shared.runningApplications.filter { app in
+            app.activationPolicy == .regular &&
+            app.bundleIdentifier != Bundle.main.bundleIdentifier &&
+            app.bundleIdentifier != "com.apple.finder" &&
+            app.localizedName != nil
+        }
+
+        if let appToActivate = runningApps.first {
+            print("🎯 Activating app: \(appToActivate.localizedName ?? "Unknown")")
+            appToActivate.activate(options: [])
+        } else {
+            // Fallback: just hide our app if no other apps are running
+            print("⚠️ No non-Finder apps to activate, hiding app")
+            NSApp.hide(nil)
+        }
     }
 }

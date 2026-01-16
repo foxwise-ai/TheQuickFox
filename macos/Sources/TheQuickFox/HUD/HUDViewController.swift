@@ -766,7 +766,10 @@ final class HUDViewController: NSViewController {
     }
 
     private func showWindow() {
-        guard !hudWindow.isVisible else { return }
+        guard !hudWindow.isVisible else {
+            print("⚠️ HUD window already visible, skipping showWindow")
+            return
+        }
 
         // Only reposition if we're not preserving the position
         if !preserveWindowPosition {
@@ -801,6 +804,10 @@ final class HUDViewController: NSViewController {
 
         // Start shortcut window when HUD opens
         startShortcutWindow()
+
+        // Notify observers that HUD appeared (used by completion screen)
+        print("📣 Posting hudDidAppear notification")
+        NotificationCenter.default.post(name: .hudDidAppear, object: nil)
     }
 
     private func hideWindow() {

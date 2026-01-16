@@ -141,6 +141,7 @@ var showInDock = true
 
 // UserDefaults keys
 let onboardingCompletedKey = "com.foxwiseai.thequickfox.onboardingCompleted"
+let needsPostRestartScreenKey = "com.foxwiseai.thequickfox.needsPostRestartScreen"
 
 // Set app delegate first
 NSApp.delegate = AppDelegate.shared
@@ -270,6 +271,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApplication.shared.setActivationPolicy(.regular)
         }
 
+        // Pre-warm HUD so first Control-Control is instant
+        DispatchQueue.main.async {
+            let _ = HUDManager.shared
+            print("✅ HUD pre-warmed")
+        }
+
         // Initialize and configure Sparkle updater after a short delay
         DispatchQueue.main.async {
             UpdateManager.shared.configure()
@@ -325,12 +332,78 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Check if onboarding has been completed
         let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingCompletedKey)
+        let needsPostRestartScreen = UserDefaults.standard.bool(forKey: needsPostRestartScreenKey)
 
         if !hasCompletedOnboarding {
             // First launch - show onboarding
             print("🎯 First launch detected - showing onboarding")
             DispatchQueue.main.async { [weak self] in
                 self?.showOnboarding()
+            }
+        } else if needsPostRestartScreen {
+            // Post-restart after screen recording permission - show completion screen
+            let hasAccessibility = PermissionsState.shared.checkAccessibilityPermission()
+            let hasScreenRecording = PermissionsState.shared.checkScreenRecordingPermission()
+
+            print("🔍 Post-restart check - accessibility: \(hasAccessibility), screenRecording: \(hasScreenRecording)")
+
+            if hasAccessibility && hasScreenRecording {
+                print("🎉 Post-restart detected with all permissions - showing completion screen")
+                // Clear the flag
+                UserDefaults.standard.set(false, forKey: needsPostRestartScreenKey)
+
+                // Pre-warm HUD synchronously before setting up detector (critical for completion flow)
+                print("🔥 Pre-warming HUD for completion screen...")
+                let _ = HUDManager.shared
+                print("✅ HUD pre-warmed for completion screen")
+
+                // Setup event detector now that HUD is ready
+                setupDoubleControlDetector()
+
+                // Show completion screen
+                DispatchQueue.main.async { [weak self] in
+                    self?.showCompletionScreen()
+                }
+            } else if hasAccessibility {
+                // Screen recording not detected yet - retry after a short delay
+                // macOS sometimes needs a moment after restart to report permission correctly
+                print("⏳ Screen recording not detected yet, retrying in 1 second...")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    let retryScreenRecording = PermissionsState.shared.checkScreenRecordingPermission()
+                    print("🔍 Retry check - screenRecording: \(retryScreenRecording)")
+
+                    if retryScreenRecording {
+                        print("🎉 Screen recording now granted - showing completion screen")
+                        UserDefaults.standard.set(false, forKey: needsPostRestartScreenKey)
+
+                        let _ = HUDManager.shared
+                        setupDoubleControlDetector()
+
+                        self?.showCompletionScreen()
+                    } else {
+                        // Still not granted - show onboarding
+                        print("⚠️ Screen recording still not granted - showing onboarding")
+                        UserDefaults.standard.set(false, forKey: needsPostRestartScreenKey)
+                        self?.showOnboardingWithPermissionsError()
+                    }
+                }
+            } else {
+                // Permissions not granted yet - show onboarding with error
+                print("⚠️ Post-restart but permissions missing - showing onboarding")
+                UserDefaults.standard.set(false, forKey: needsPostRestartScreenKey)
+                DispatchQueue.main.async { [weak self] in
+                    self?.showOnboardingWithPermissionsError()
+                }
+            }
+        } else if PermissionsState.shared.checkAccessibilityPermission() && PermissionsState.shared.checkScreenRecordingPermission() {
+            // Onboarding complete with all permissions - show completion screen on launch
+            print("🎉 App launch with completed onboarding - showing completion screen")
+
+            let _ = HUDManager.shared
+            setupDoubleControlDetector()
+
+            DispatchQueue.main.async { [weak self] in
+                self?.showCompletionScreen()
             }
         } else {
             // Check accessibility permission (this doesn't trigger a dialog)
@@ -399,6 +472,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return createDockMenu()
     }
 
+    // Handle dock icon click - show completion screen
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingCompletedKey)
+
+        if hasCompletedOnboarding && !flag {
+            print("🎉 Dock clicked - showing completion screen")
+            showCompletionScreen()
+            return false
+        }
+
+        return true
+    }
+
     // Handle URL scheme (thequickfox://)
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
@@ -444,6 +530,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func showOnboarding() {
         onboardingWindowController = OnboardingWindowController()
         onboardingWindowController?.show()
+    }
+
+    @objc func showCompletionScreen() {
+        onboardingWindowController = OnboardingWindowController()
+        onboardingWindowController?.showCompletionMode()
     }
 
     @objc func showOnboardingWithPermissionsError() {

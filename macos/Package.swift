@@ -56,6 +56,7 @@ let package = Package(
             resources: [
                 .process("Onboarding/Resources"),
                 .process("Upgrade/Resources"),
+                .process("Reminder/Resources"),
                 .process("Visual/MorphShader.metal"),
                 .process("../../Resources")
             ]

@@ -1,73 +1,265 @@
-// Onboarding carousel logic
+// ============================================
+// Onboarding State Management
+// ============================================
+
 let currentPanel = 1;
-const totalPanels = 4;
-// Expose currentPanel to Swift
+const totalPanels = 5;
 window.currentPanel = currentPanel;
+
+// Permission states
 let permissionsGranted = {
     accessibility: false,
     screenRecording: false
 };
 
+// User input states
 let termsAccepted = false;
 let emailValid = false;
 let userEmail = '';
+let selectedTone = 'professional';
+let hasTransformed = false;  // Track if user has tried the transform
 
-// Double control detection
-let lastControlPressTime = 0;
-const DOUBLE_CONTROL_THRESHOLD = 500; // milliseconds
 
-// Initialize
+// ============================================
+// Initialization
+// ============================================
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Set up keyboard navigation
-    document.addEventListener('keydown', handleKeyboard);
-
-    // Set up double control detection
-    setupDoubleControlDetection();
-
-    // Set up send button handler
-    setupSendButton();
-
-    // Update UI
+    setupKeyboardNavigation();
+    setupToneChips();
     updateUI();
 });
 
-// Navigate to permissions page with error message
-window.navigateToPermissionsWithError = function(errorMessage) {
-    // Navigate to permissions page (panel 4)
-    currentPanel = 4;
-    updateUI();
 
-    // Add error message to permissions page
-    setTimeout(() => {
-        const permissionsPanel = document.querySelector('.panel[data-panel="4"] .panel-content');
-        if (permissionsPanel) {
-            // Check if error message already exists
-            let errorDiv = permissionsPanel.querySelector('.permissions-error');
-            if (!errorDiv) {
-                errorDiv = document.createElement('div');
-                errorDiv.className = 'permissions-error';
-                // Insert after the h1
-                const h1 = permissionsPanel.querySelector('h1');
-                if (h1 && h1.nextSibling) {
-                    permissionsPanel.insertBefore(errorDiv, h1.nextSibling);
-                } else {
-                    permissionsPanel.insertBefore(errorDiv, permissionsPanel.firstChild);
-                }
+// ============================================
+// Panel 2: Interactive Transform
+// ============================================
+
+function setupToneChips() {
+    document.querySelectorAll('.tone-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('.tone-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            selectedTone = chip.dataset.tone;
+        });
+    });
+}
+
+async function transformText() {
+    const input = document.getElementById('user-input').value.trim();
+    if (!input) {
+        document.getElementById('user-input').focus();
+        return;
+    }
+
+    const btn = document.getElementById('transform-btn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoader = btn.querySelector('.btn-loader');
+    const outputSection = document.getElementById('output-section');
+    const outputText = document.getElementById('output-text');
+    const winText = document.getElementById('win-text');
+
+    // Show loading state
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'block';
+
+    try {
+        // Call the compose API via Swift bridge
+        const result = await callComposeAPI(input, selectedTone);
+
+        // Show output
+        outputText.textContent = result;
+        outputSection.style.display = 'block';
+        winText.style.display = 'block';
+        hasTransformed = true;
+
+        // Update button to show "Continue" instead of "Skip"
+        updateContinueButton();
+
+        // Track the win
+        sendMessage('track', { event: 'onboarding_transform_success', props: { tone: selectedTone } });
+
+    } catch (error) {
+        console.error('Transform failed:', error);
+        // Show a fallback response
+        const fallbackResponses = {
+            professional: `Thank you for your message. I wanted to follow up regarding: "${input}". Please let me know if you need any additional information.`,
+            friendly: `Hey there! Thanks for reaching out about "${input}". Happy to help with anything else!`,
+            formal: `Dear Sir/Madam, I am writing in reference to your inquiry: "${input}". Please do not hesitate to contact me should you require further assistance.`
+        };
+        outputText.textContent = fallbackResponses[selectedTone];
+        outputSection.style.display = 'block';
+        winText.style.display = 'block';
+        hasTransformed = true;
+
+        // Update button to show "Continue" instead of "Skip"
+        updateContinueButton();
+    } finally {
+        btn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+}
+
+function callComposeAPI(input, tone) {
+    return new Promise((resolve, reject) => {
+        // Send to Swift to call the actual API
+        sendMessage('composeDemo', {
+            input: input,
+            tone: tone,
+            callback: 'handleComposeResult'
+        });
+
+        // Set up a listener for the response
+        window.handleComposeResult = function(result) {
+            if (result.success) {
+                resolve(result.text);
+            } else {
+                reject(new Error(result.error || 'API call failed'));
             }
-            errorDiv.textContent = errorMessage;
+            delete window.handleComposeResult;
+        };
+
+        // Timeout fallback
+        setTimeout(() => {
+            if (window.handleComposeResult) {
+                reject(new Error('Timeout'));
+                delete window.handleComposeResult;
+            }
+        }, 15000);
+    });
+}
+
+function copyResult() {
+    const outputText = document.getElementById('output-text').textContent;
+    navigator.clipboard.writeText(outputText).then(() => {
+        const copyBtn = document.querySelector('.copy-btn');
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+            copyBtn.textContent = originalText;
+        }, 1500);
+    });
+}
+
+// ============================================
+// Permission Handling
+// ============================================
+
+function grantPermission(type) {
+    sendMessage('requestPermissions', { type });
+}
+
+window.updatePermissionStatus = function(status) {
+    console.log('Permission status update:', status);
+    permissionsGranted.accessibility = status.accessibility;
+    permissionsGranted.screenRecording = status.screenRecording;
+
+    // Update accessibility button/card (panel 3)
+    const accessibilityCard = document.getElementById('accessibility-card');
+    const accessibilityBtn = document.getElementById('accessibility-btn');
+    if (accessibilityCard && accessibilityBtn) {
+        if (permissionsGranted.accessibility) {
+            accessibilityCard.classList.add('granted');
+            accessibilityBtn.textContent = 'Enabled';
+            accessibilityBtn.classList.add('granted');
+            accessibilityBtn.disabled = true;
+        } else {
+            accessibilityCard.classList.remove('granted');
+            accessibilityBtn.textContent = 'Enable';
+            accessibilityBtn.classList.remove('granted');
+            accessibilityBtn.disabled = false;
         }
-    }, 100);
+    }
+
+    // Update screen access button/card (panel 5)
+    const screenCard = document.getElementById('screen-card');
+    const screenBtn = document.getElementById('screen-btn');
+    const screenStatusText = document.getElementById('screen-status-text');
+    if (screenCard && screenBtn) {
+        if (permissionsGranted.screenRecording) {
+            screenCard.classList.add('granted');
+            screenBtn.textContent = 'Enabled';
+            screenBtn.classList.add('granted');
+            screenBtn.disabled = true;
+            if (screenStatusText) screenStatusText.textContent = 'Access granted!';
+        } else {
+            screenCard.classList.remove('granted');
+            screenBtn.textContent = 'Enable';
+            screenBtn.classList.remove('granted');
+            screenBtn.disabled = false;
+            if (screenStatusText) screenStatusText.textContent = 'Click Enable, then toggle on TheQuickFox';
+        }
+    }
+
+    // If screen recording granted while on panel 5, auto-complete
+    if (currentPanel === 5 && permissionsGranted.screenRecording) {
+        // Small delay to let user see the "granted" state
+        setTimeout(() => {
+            completeOnboarding();
+        }, 500);
+    }
+
+    updateContinueButton();
 };
 
-// Navigation functions
+function skipToPermissions() {
+    currentPanel = 3;
+    updateUI();
+    sendMessage('track', { event: 'skipped_to_permissions' });
+}
+
+
+// ============================================
+// Email & Terms Validation
+// ============================================
+
+function updateEmailValidity() {
+    const emailField = document.getElementById('email-field');
+    userEmail = emailField.value.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    emailValid = emailRegex.test(userEmail);
+    updateContinueButton();
+}
+
+function updateTermsAcceptance() {
+    const checkbox = document.getElementById('terms-checkbox');
+    termsAccepted = checkbox.checked;
+    updateContinueButton();
+
+    if (termsAccepted) {
+        sendMessage('track', { event: 'terms_accepted' });
+    }
+}
+
+function openTermsOfService(event) {
+    event.preventDefault();
+    sendMessage('openLink', { url: 'https://www.thequickfox.ai/terms' });
+}
+
+function openPrivacyPolicy(event) {
+    event.preventDefault();
+    sendMessage('openLink', { url: 'https://www.thequickfox.ai/privacy/' });
+}
+
+// ============================================
+// Navigation
+// ============================================
+
 function navigateNext() {
     if (currentPanel < totalPanels) {
+        // When leaving Panel 4 (email/TOS), save onboarding progress early
+        // This ensures the flag is set before screen recording (which may restart the app)
+        if (currentPanel === 4 && termsAccepted && emailValid) {
+            sendMessage('saveOnboardingProgress', { email: userEmail });
+        }
+
         currentPanel++;
         updateUI();
         sendMessage('track', { event: 'panel_view', props: { panel: currentPanel } });
     } else if (currentPanel === totalPanels) {
-        // Last panel - check if permissions are granted, terms accepted, and email provided
-        if (permissionsGranted.accessibility && permissionsGranted.screenRecording && termsAccepted && emailValid) {
+        if (canComplete()) {
             completeOnboarding();
         }
     }
@@ -81,8 +273,28 @@ function navigateBack() {
     }
 }
 
+function canProceed() {
+    switch (currentPanel) {
+        case 1:
+            return true;  // Always can proceed from demo
+        case 2:
+            return true;  // Can proceed even without trying (but encourage trying)
+        case 3:
+            return permissionsGranted.accessibility;  // Must grant accessibility
+        case 4:
+            return termsAccepted && emailValid;  // Must accept terms and enter email
+        case 5:
+            return permissionsGranted.screenRecording;  // Must grant screen recording
+        default:
+            return true;
+    }
+}
+
+function canComplete() {
+    return permissionsGranted.accessibility && permissionsGranted.screenRecording && termsAccepted && emailValid;
+}
+
 function updateUI() {
-    // Update exposed currentPanel for Swift
     window.currentPanel = currentPanel;
 
     // Update carousel position
@@ -90,7 +302,7 @@ function updateUI() {
     const offset = -(currentPanel - 1) * 100;
     carousel.style.transform = `translateX(${offset}%)`;
 
-    // Update active panel
+    // Update active panel class
     document.querySelectorAll('.panel').forEach((panel, index) => {
         panel.classList.toggle('active', index + 1 === currentPanel);
     });
@@ -102,290 +314,225 @@ function updateUI() {
 
     // Update navigation buttons
     const backButton = document.querySelector('.back-button');
-    const continueButton = document.querySelector('.continue-button');
+    const continueButton = document.getElementById('continue-btn');
 
     // Show/hide back button
-    backButton.style.display = currentPanel === 1 ? 'none' : 'block';
+    backButton.style.visibility = currentPanel === 1 ? 'hidden' : 'visible';
 
-    // Update continue button
-    if (currentPanel === 2) {
-        // focus reply field
-        // for some reason it messed up the UI if I do focus instantly
-        setTimeout(function () {
-                    document.getElementById('reply-field').focus();
-        }, 1000)
+    // Show skip button only on panels 1 and 2 (before permission screens)
+    const skipButton = document.getElementById('skip-btn');
+    if (skipButton) {
+        skipButton.style.display = (currentPanel === 1 || currentPanel === 2) ? 'inline-block' : 'none';
     }
-    if (currentPanel === totalPanels) {
-        continueButton.textContent = 'Finish';
-        continueButton.disabled = !(permissionsGranted.accessibility && permissionsGranted.screenRecording && termsAccepted && emailValid);
-        // Update permission buttons when we arrive at permissions page
-        updatePermissionButtons();
-        // Notify Swift to start monitoring permissions
+
+    // Show navigation on all panels
+    const navigation = document.querySelector('.navigation');
+    if (navigation) {
+        navigation.style.display = 'flex';
+    }
+
+    updateContinueButton();
+
+    // Handle panel-specific logic
+    if (currentPanel === 2) {
+        // Focus input after transition
+        setTimeout(() => {
+            const input = document.getElementById('user-input');
+            if (input) input.focus();
+        }, 500);
+    }
+
+    if (currentPanel === 4) {
+        // Focus email input after transition
+        setTimeout(() => {
+            const emailField = document.getElementById('email-field');
+            if (emailField) emailField.focus();
+        }, 500);
+    }
+
+    if (currentPanel === 3 || currentPanel === 5) {
+        // Start permission monitoring for permission panels
         sendMessage('startPermissionMonitoring', {});
-    } else {
-        continueButton.textContent = 'Continue';
-        continueButton.disabled = false;
     }
 }
 
-// Double control detection
-function setupDoubleControlDetection() {
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Control') {
-            const now = Date.now();
+function updateContinueButton() {
+    const continueButton = document.getElementById('continue-btn');
 
-            if (lastControlPressTime && (now - lastControlPressTime) <= DOUBLE_CONTROL_THRESHOLD) {
-                // Double control detected!
-                handleDoubleControl();
-                lastControlPressTime = 0; // Reset
-            } else {
-                lastControlPressTime = now;
+    switch (currentPanel) {
+        case 1:
+            continueButton.textContent = 'Continue';
+            continueButton.disabled = false;
+            break;
+        case 2:
+            continueButton.textContent = 'Continue';
+            continueButton.disabled = false;
+            break;
+        case 3:
+            continueButton.textContent = 'Continue';
+            continueButton.disabled = !permissionsGranted.accessibility;
+            break;
+        case 4:
+            continueButton.textContent = 'Continue';
+            continueButton.disabled = !(termsAccepted && emailValid);  // Must accept terms and email
+            break;
+        case 5:
+            continueButton.textContent = 'Finish';
+            continueButton.disabled = !permissionsGranted.screenRecording;  // Must grant screen recording
+            break;
+        default:
+            continueButton.textContent = 'Continue';
+            continueButton.disabled = false;
+    }
+}
+
+// ============================================
+// Keyboard Navigation
+// ============================================
+
+function setupKeyboardNavigation() {
+    // Disabled - arrow keys were accidentally advancing panels
+}
+
+// ============================================
+// Completion
+// ============================================
+
+function completeOnboarding() {
+    sendMessage('completeOnboarding', { email: userEmail });
+
+    // Fire confetti!
+    fireConfetti();
+
+    sendMessage('track', { event: 'onboarding_completed', props: {
+        has_screen_recording: permissionsGranted.screenRecording,
+        tried_transform: hasTransformed
+    }});
+}
+
+function closeOnboarding() {
+    sendMessage('closeWindow', {});
+}
+
+// ============================================
+// Confetti Animation
+// ============================================
+
+function fireConfetti() {
+    const canvas = document.getElementById('confetti-canvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const particles = [];
+    const particleCount = 150;
+    const colors = ['#007aff', '#0055d4', '#ff9500', '#34c759', '#5ac8fa', '#ff3b30'];
+
+    class Particle {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = -10;
+            this.size = Math.random() * 8 + 4;
+            this.speedY = Math.random() * 3 + 2;
+            this.speedX = Math.random() * 4 - 2;
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+            this.rotation = Math.random() * 360;
+            this.rotationSpeed = Math.random() * 10 - 5;
+            this.opacity = 1;
+        }
+
+        update() {
+            this.y += this.speedY;
+            this.x += this.speedX;
+            this.rotation += this.rotationSpeed;
+            this.speedY += 0.1;  // Gravity
+
+            if (this.y > canvas.height - 100) {
+                this.opacity -= 0.02;
             }
         }
-    });
-}
 
-function handleDoubleControl() {
-    // Only handle on demo pages (2 and 3)
-    if (currentPanel === 2) {
-        // Support page - check if reply field is focused
-        const replyField = document.getElementById('reply-field');
-        if (document.activeElement === replyField) {
-            console.log('Double control on support page with reply field focused');
-            sendMessage('activateHUD', {
-                mode: 'respond',
-                demoPageContext: 'support'
-            });
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.rotation * Math.PI / 180);
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = this.opacity;
+            ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size / 2);
+            ctx.restore();
         }
-    } else if (currentPanel === 3) {
-        // Logo page - always activate in Ask mode
-        console.log('Double control on logo page');
-        sendMessage('activateHUD', {
-            mode: 'ask',
-            demoPageContext: 'logo'
+    }
+
+    // Create particles
+    for (let i = 0; i < particleCount; i++) {
+        setTimeout(() => {
+            particles.push(new Particle());
+        }, i * 20);
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        particles.forEach((particle, index) => {
+            particle.update();
+            particle.draw();
+
+            if (particle.opacity <= 0) {
+                particles.splice(index, 1);
+            }
         });
-    }
-}
 
-// Keyboard navigation
-function handleKeyboard(event) {
-    switch (event.key) {
-        case 'ArrowRight':
-            navigateNext();
-            break;
-        case 'ArrowLeft':
-            navigateBack();
-            break;
-    }
-
-    // Handle Cmd+Arrow
-    if (event.metaKey) {
-        if (event.key === 'ArrowRight') {
-            navigateNext();
-        } else if (event.key === 'ArrowLeft') {
-            navigateBack();
+        if (particles.length > 0) {
+            requestAnimationFrame(animate);
         }
     }
+
+    animate();
 }
 
-// Permission handling
-function grantPermission(type) {
-    sendMessage('requestPermissions', { type });
-}
+// ============================================
+// Error Handling
+// ============================================
 
-// Update permission status from Swift
-window.updatePermissionStatus = function(status) {
-    console.log('Received permission status:', status);
-    permissionsGranted.accessibility = status.accessibility;
-    permissionsGranted.screenRecording = status.screenRecording;
+window.navigateToPermissionsWithError = function(errorMessage) {
+    // Navigate to accessibility panel (panel 3)
+    currentPanel = 3;
+    updateUI();
 
-    // Update button states
-    updatePermissionButtons();
-
-    // Check if we can enable the continue button
-    if (currentPanel === totalPanels) {
-        const continueButton = document.querySelector('.continue-button');
-        continueButton.disabled = !(permissionsGranted.accessibility && permissionsGranted.screenRecording && termsAccepted && emailValid);
-    }
+    setTimeout(() => {
+        const panelContent = document.querySelector('.panel[data-panel="3"] .panel-content');
+        if (panelContent) {
+            let errorDiv = panelContent.querySelector('.permissions-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'permissions-error';
+                panelContent.insertBefore(errorDiv, panelContent.firstChild);
+            }
+            errorDiv.textContent = errorMessage;
+        }
+    }, 100);
 };
 
-// Update permission button states
-function updatePermissionButtons() {
-    console.log('Updating permission buttons - permissions:', permissionsGranted);
+// ============================================
+// Swift Communication
+// ============================================
 
-    // Update accessibility button
-    const accessibilityButton = document.querySelector('[onclick="grantPermission(\'accessibility\')"]');
-    if (accessibilityButton) {
-        console.log('Found accessibility button');
-        if (permissionsGranted.accessibility) {
-            accessibilityButton.textContent = '✓ Granted';
-            accessibilityButton.classList.add('granted');
-            accessibilityButton.disabled = true;
-        } else {
-            accessibilityButton.textContent = 'Grant';
-            accessibilityButton.classList.remove('granted');
-            accessibilityButton.disabled = false;
-        }
-    } else {
-        console.log('Accessibility button not found');
-    }
-
-    // Update screen recording button
-    const screenRecordingButton = document.querySelector('[onclick="grantPermission(\'screenRecording\')"]');
-    if (screenRecordingButton) {
-        console.log('Found screen recording button');
-        if (permissionsGranted.screenRecording) {
-            screenRecordingButton.textContent = '✓ Granted';
-            screenRecordingButton.classList.add('granted');
-            screenRecordingButton.disabled = true;
-        } else {
-            screenRecordingButton.textContent = 'Grant';
-            screenRecordingButton.classList.remove('granted');
-            screenRecordingButton.disabled = false;
-        }
-    } else {
-        console.log('Screen recording button not found');
-    }
-}
-
-// Email validation
-function updateEmailValidity() {
-    const emailField = document.getElementById('email-field');
-    userEmail = emailField.value.trim();
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    emailValid = emailRegex.test(userEmail);
-
-    // Update continue button if we're on the permissions panel
-    if (currentPanel === totalPanels) {
-        const continueButton = document.querySelector('.continue-button');
-        continueButton.disabled = !(permissionsGranted.accessibility && permissionsGranted.screenRecording && termsAccepted && emailValid);
-    }
-}
-
-// Terms acceptance
-function updateTermsAcceptance() {
-    const checkbox = document.getElementById('terms-checkbox');
-    termsAccepted = checkbox.checked;
-
-    // Update continue button if we're on the permissions panel
-    if (currentPanel === totalPanels) {
-        const continueButton = document.querySelector('.continue-button');
-        continueButton.disabled = !(permissionsGranted.accessibility && permissionsGranted.screenRecording && termsAccepted && emailValid);
-    }
-
-    // Track the acceptance
-    if (termsAccepted) {
-        sendMessage('track', { event: 'terms_accepted', props: { timestamp: new Date().toISOString() } });
-    }
-}
-
-// External links
-function openTermsOfService(event) {
-    event.preventDefault();
-    sendMessage('openLink', { url: 'https://www.thequickfox.ai/terms.html' });
-}
-
-function openPrivacyPolicy(event) {
-    event.preventDefault();
-    sendMessage('openLink', { url: 'https://www.thequickfox.ai/privacy.html' });
-}
-
-
-// Complete onboarding
-function completeOnboarding() {
-    localStorage.setItem('onboardingCompleted', 'true');
-    sendMessage('completeOnboarding', { email: userEmail });
-}
-
-// WebKit message bridge
 function sendMessage(action, data = {}) {
     if (window.webkit && window.webkit.messageHandlers.onboarding) {
         window.webkit.messageHandlers.onboarding.postMessage({
             action,
             ...data
         });
+    } else {
+        console.log('Swift bridge not available:', action, data);
     }
 }
 
-// Set up send button handler
-function setupSendButton() {
-    const sendButton = document.querySelector('.submit-arrow');
-    if (sendButton) {
-        sendButton.addEventListener('click', handleSendMessage);
-    }
+// ============================================
+// System Appearance
+// ============================================
 
-    // Also handle Enter key in textarea
-    const replyField = document.getElementById('reply-field');
-    if (replyField) {
-        replyField.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-            }
-        });
-    }
-}
-
-// Handle sending a message
-function handleSendMessage() {
-    const replyField = document.getElementById('reply-field');
-    const message = replyField.value.trim();
-
-    if (!message) return;
-
-    // Create sent message element
-    const supportTicket = document.querySelector('.support-ticket');
-    const sentMessage = document.createElement('div');
-    sentMessage.className = 'ticket-message sent-message';
-    sentMessage.innerHTML = `
-        <div class="message-author">Support Agent (You)</div>
-        <div class="message-content">${escapeHtml(message)}</div>
-    `;
-
-    // Insert before reply section
-    const replySection = document.querySelector('.reply-section');
-    supportTicket.insertBefore(sentMessage, replySection);
-
-    // Clear the textarea
-    replyField.value = '';
-
-    // Add animation class
-    sentMessage.classList.add('message-sent-animation');
-
-    // Show success feedback
-    const sendButton = document.querySelector('.submit-arrow');
-    const originalHTML = sendButton.innerHTML;
-    sendButton.innerHTML = '✓';
-    sendButton.style.color = '#34c759';
-
-    // Reset button after animation
-    setTimeout(() => {
-        sendButton.innerHTML = originalHTML;
-        sendButton.style.color = '';
-    }, 1000);
-
-    // Simulate customer response after a delay
-    setTimeout(() => {
-        const customerResponse = document.createElement('div');
-        customerResponse.className = 'ticket-message';
-        customerResponse.innerHTML = `
-            <div class="message-author">buzz@killington.com</div>
-            <div class="message-content">Thanks for the help and sorry to be a buzzkill</div>
-        `;
-        supportTicket.insertBefore(customerResponse, replySection);
-        customerResponse.classList.add('message-received-animation');
-    }, 2000);
-}
-
-// Helper to escape HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// System appearance support
 window.setSystemAppearance = function(mode) {
     document.body.classList.toggle('dark-mode', mode === 'dark');
 };

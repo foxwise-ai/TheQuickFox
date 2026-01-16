@@ -1,0 +1,4 @@
+# Protect GitHub workflows and configuration
+# Changes to these files require review from repo owners
+
+/.github/ @foxwise-ai @hgezim
