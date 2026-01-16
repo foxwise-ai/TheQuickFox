@@ -427,7 +427,7 @@ function fireConfetti() {
 
     const particles = [];
     const particleCount = 150;
-    const colors = ['#667eea', '#764ba2', '#ff9500', '#34c759', '#007aff', '#ff3b30'];
+    const colors = ['#007aff', '#0055d4', '#ff9500', '#34c759', '#5ac8fa', '#ff3b30'];
 
     class Particle {
         constructor() {
