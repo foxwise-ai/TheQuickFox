@@ -112,6 +112,44 @@
             line-height: 1.5;
         }
 
+        /* Running apps list */
+        .running-apps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin: 24px 0;
+        }
+
+        .app-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 12px;
+            border-radius: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            cursor: default;
+            min-width: 80px;
+        }
+
+        .app-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+        }
+
+        .app-name {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            max-width: 70px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
         .close-btn {
             background: var(--accent);
             color: white;
@@ -144,7 +182,9 @@
                 </svg>
             </div>
             <h1>You're all set!</h1>
-            <p class="subtitle">Now let's try it out.</p>
+            <p class="subtitle">Try it on one of your open apps:</p>
+
+            <div class="running-apps" id="running-apps"></div>
 
             <div class="keyboard-demo-large pulse-animation">
                 <span class="key-visual">
@@ -153,8 +193,6 @@
                 </span>
                 <span class="times-badge">x2</span>
             </div>
-
-            <p class="subtitle">Press Control twice quickly</p>
 
             <p class="hint-text hidden" id="hint-text">Try pressing a bit faster!</p>
         </div>
@@ -168,11 +206,16 @@
                 </svg>
             </div>
             <h1>It works!</h1>
-            <p class="subtitle">TheQuickFox is ready to use.</p>
+            <p class="subtitle">Now try it in one of your apps:</p>
 
-            <div class="next-steps">
-                <h3>What's next?</h3>
-                <p>Open any app - email, Slack, browser, notes - and press Control twice to summon TheQuickFox. It sees what's on your screen and helps you write.</p>
+            <div class="running-apps" id="running-apps-success"></div>
+
+            <div class="keyboard-demo-large" style="margin: 20px 0;">
+                <span class="key-visual">
+                    <span class="key-symbol">^</span>
+                    <span class="key-text">control</span>
+                </span>
+                <span class="times-badge">x2</span>
             </div>
 
             <button class="close-btn" onclick="closeWindow()">Got it</button>
@@ -244,6 +287,24 @@
         // System appearance
         window.setSystemAppearance = function(mode) {
             document.body.classList.toggle('dark-mode', mode === 'dark');
+        };
+
+        // Receive running apps from Swift
+        window.setRunningApps = function(apps) {
+            if (!apps || apps.length === 0) return;
+
+            const html = apps.map(app => `
+                <div class="app-item">
+                    <img class="app-icon" src="${app.icon}" alt="${app.name}">
+                    <span class="app-name">${app.name}</span>
+                </div>
+            `).join('');
+
+            // Populate both containers
+            const container1 = document.getElementById('running-apps');
+            const container2 = document.getElementById('running-apps-success');
+            if (container1) container1.innerHTML = html;
+            if (container2) container2.innerHTML = html;
         };
 
         // Confetti animation (same as onboarding)

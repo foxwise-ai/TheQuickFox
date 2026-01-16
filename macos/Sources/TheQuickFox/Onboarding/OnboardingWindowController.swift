@@ -24,6 +24,8 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private var shouldShowPermissionsError = false
     private var shouldShowTOSError = false
     private var isCompletionMode = false
+    private var hudAppearedBeforeWebViewLoaded = false  // Track if HUD appeared before completion.html loaded
+    private var completionWebViewReady = false  // Track if completion.html JS is ready
     var permissionStatusTimer: Timer?
 
 
@@ -297,10 +299,14 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     func showCompletionMode() {
         isCompletionMode = true
 
+        // Change window title so HUD can still open (main.swift checks for "TheQuickFox" title)
+        window?.title = "TheQuickFox - Ready"
+
         // Load completion.html instead of index.html
         loadCompletionContent()
 
         // Listen for HUD appearing
+        print("👀 Adding hudDidAppear observer")
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleHUDAppeared),
@@ -313,11 +319,33 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func handleHUDAppeared() {
-        print("🎉 HUD appeared - notifying completion screen")
-        // Call JS to transition to success state
-        webView?.evaluateJavaScript("window.onHUDAppeared();") { _, error in
+        print("🎉 HUD appeared - notifying completion screen (webViewReady: \(completionWebViewReady))")
+
+        // If webView isn't ready yet, store the flag and notify later
+        guard completionWebViewReady else {
+            print("⏳ WebView not ready yet, storing flag for later")
+            hudAppearedBeforeWebViewLoaded = true
+            return
+        }
+
+        notifyJSOfHUDAppearance()
+    }
+
+    private func notifyJSOfHUDAppearance() {
+        // Call JS to transition to success state (HUD stays open for user to explore)
+        let script = """
+            if (typeof window.onHUDAppeared === 'function') {
+                window.onHUDAppeared();
+                'success';
+            } else {
+                'function not found';
+            }
+        """
+        self.webView?.evaluateJavaScript(script) { result, error in
             if let error = error {
                 print("❌ Failed to notify JS of HUD appearance: \(error)")
+            } else {
+                print("✅ JS result: \(result ?? "nil")")
             }
         }
     }
@@ -365,6 +393,61 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         // Expand web view to fill the container (no header needed)
         webView.frame = containerView.bounds
         webView.alphaValue = 1
+
+        // Pass running apps to the web view
+        injectRunningApps()
+
+        // Mark webView as ready for JS calls
+        completionWebViewReady = true
+
+        // If HUD appeared before webView was ready, notify now
+        if hudAppearedBeforeWebViewLoaded {
+            print("🔔 HUD appeared earlier - notifying JS now")
+            hudAppearedBeforeWebViewLoaded = false
+            notifyJSOfHUDAppearance()
+        }
+    }
+
+    /// Get running apps and inject them into the completion page
+    private func injectRunningApps() {
+        var appsData: [[String: String]] = []
+
+        // Get running applications, filter to regular apps
+        let runningApps = NSWorkspace.shared.runningApplications.filter { app in
+            app.activationPolicy == .regular &&
+            app.bundleIdentifier != Bundle.main.bundleIdentifier &&
+            app.localizedName != nil
+        }
+
+        // Take first 5 apps
+        for app in runningApps.prefix(5) {
+            guard let name = app.localizedName,
+                  let icon = app.icon else { continue }
+
+            // Convert icon to base64
+            if let tiffData = icon.tiffRepresentation,
+               let bitmapRep = NSBitmapImageRep(data: tiffData),
+               let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+                let base64 = pngData.base64EncodedString()
+                appsData.append([
+                    "name": name,
+                    "icon": "data:image/png;base64,\(base64)"
+                ])
+            }
+        }
+
+        // Inject into JavaScript
+        if let jsonData = try? JSONSerialization.data(withJSONObject: appsData),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            let script = "window.setRunningApps(\(jsonString));"
+            webView?.evaluateJavaScript(script) { _, error in
+                if let error = error {
+                    print("❌ Failed to inject running apps: \(error)")
+                } else {
+                    print("✅ Injected \(appsData.count) running apps")
+                }
+            }
+        }
     }
 
     // MARK: - Permission Status Updates
@@ -763,6 +846,8 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
 
             case "closeWindow":
                 self.windowController?.window?.close()
+                // Activate a non-Finder app (Finder causes issues)
+                self.activateNonFinderApp()
 
             case "saveOnboardingProgress":
                 // Save onboarding progress early (before screen recording which may restart app)
@@ -1043,6 +1128,26 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
             if let jsError = jsError {
                 print("❌ Failed to send compose result to JS: \(jsError)")
             }
+        }
+    }
+
+    /// Activate a non-Finder app after closing onboarding (Finder causes issues)
+    private func activateNonFinderApp() {
+        // Find a running app that isn't Finder and isn't our app
+        let runningApps = NSWorkspace.shared.runningApplications.filter { app in
+            app.activationPolicy == .regular &&
+            app.bundleIdentifier != Bundle.main.bundleIdentifier &&
+            app.bundleIdentifier != "com.apple.finder" &&
+            app.localizedName != nil
+        }
+
+        if let appToActivate = runningApps.first {
+            print("🎯 Activating app: \(appToActivate.localizedName ?? "Unknown")")
+            appToActivate.activate(options: [])
+        } else {
+            // Fallback: just hide our app if no other apps are running
+            print("⚠️ No non-Finder apps to activate, hiding app")
+            NSApp.hide(nil)
         }
     }
 }

@@ -50,15 +50,15 @@ final class UserPreferences {
     func preferredMode(isDevelopmentApp: Bool) -> HUDMode {
         // If user has explicitly set a mode, respect it
         if let savedMode = lastMode {
-            // Only exception: Code mode in non-dev apps falls back to Compose
+            // Only exception: Code mode in non-dev apps falls back to Ask
             if savedMode == .code && !isDevelopmentApp {
-                return .compose
+                return .ask
             }
             return savedMode
         }
 
-        // No saved preference (new user) - auto-detect based on app type
-        return isDevelopmentApp ? .code : .compose
+        // No saved preference (new user) - default to Ask mode
+        return .ask
     }
 
     // MARK: - Tone Persistence

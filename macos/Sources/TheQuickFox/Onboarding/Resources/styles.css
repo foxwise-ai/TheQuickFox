@@ -185,6 +185,61 @@ h1 {
     color: var(--accent-color);
 }
 
+/* Use Cases Grid */
+.use-cases {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 40px;
+    max-width: 400px;
+}
+
+.use-case {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    text-align: left;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.use-case:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow);
+}
+
+.use-case-icon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    border-radius: 12px;
+    color: white;
+}
+
+.use-case-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.use-case-text strong {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.use-case-text span {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
 /* ============================================
    Panel 2: Try It Yourself
    ============================================ */

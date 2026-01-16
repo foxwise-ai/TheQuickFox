@@ -359,6 +359,14 @@ function updateUI() {
         }, 500);
     }
 
+    if (currentPanel === 4) {
+        // Focus email input after transition
+        setTimeout(() => {
+            const emailField = document.getElementById('email-field');
+            if (emailField) emailField.focus();
+        }, 500);
+    }
+
     if (currentPanel === 3 || currentPanel === 4) {
         // Start permission monitoring
         sendMessage('startPermissionMonitoring', {});

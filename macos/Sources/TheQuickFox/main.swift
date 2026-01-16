@@ -271,6 +271,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApplication.shared.setActivationPolicy(.regular)
         }
 
+        // Pre-warm HUD so first Control-Control is instant
+        DispatchQueue.main.async {
+            let _ = HUDManager.shared
+            print("✅ HUD pre-warmed")
+        }
+
         // Initialize and configure Sparkle updater after a short delay
         DispatchQueue.main.async {
             UpdateManager.shared.configure()
@@ -344,7 +350,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Clear the flag
                 UserDefaults.standard.set(false, forKey: needsPostRestartScreenKey)
 
-                // Setup event detector first so double-control works
+                // Pre-warm HUD synchronously before setting up detector (critical for completion flow)
+                print("🔥 Pre-warming HUD for completion screen...")
+                let _ = HUDManager.shared
+                print("✅ HUD pre-warmed for completion screen")
+
+                // Setup event detector now that HUD is ready
                 setupDoubleControlDetector()
 
                 // Show completion screen
