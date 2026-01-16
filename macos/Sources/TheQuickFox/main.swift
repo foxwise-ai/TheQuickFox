@@ -395,6 +395,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.showOnboardingWithPermissionsError()
                 }
             }
+        } else if PermissionsState.shared.checkAccessibilityPermission() && PermissionsState.shared.checkScreenRecordingPermission() {
+            // Onboarding complete with all permissions - show completion screen on launch
+            print("🎉 App launch with completed onboarding - showing completion screen")
+
+            let _ = HUDManager.shared
+            setupDoubleControlDetector()
+
+            DispatchQueue.main.async { [weak self] in
+                self?.showCompletionScreen()
+            }
         } else {
             // Check accessibility permission (this doesn't trigger a dialog)
             let hasAccessibility = PermissionsState.shared.checkAccessibilityPermission()
@@ -460,6 +470,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // This gives users access to fox tail menu items even if menu bar icon is hidden under the notch
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         return createDockMenu()
+    }
+
+    // Handle dock icon click - show completion screen
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingCompletedKey)
+
+        if hasCompletedOnboarding && !flag {
+            print("🎉 Dock clicked - showing completion screen")
+            showCompletionScreen()
+            return false
+        }
+
+        return true
     }
 
     // Handle URL scheme (thequickfox://)
