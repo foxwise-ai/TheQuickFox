@@ -336,10 +336,10 @@ function updateUI() {
     // Show/hide back button
     backButton.style.visibility = currentPanel === 1 ? 'hidden' : 'visible';
 
-    // Hide skip button (no longer used - continue button handles Skip/Continue toggle)
+    // Show skip button only on panels 1 and 2 (before permission screens)
     const skipButton = document.getElementById('skip-btn');
     if (skipButton) {
-        skipButton.style.display = 'none';
+        skipButton.style.display = (currentPanel === 1 || currentPanel === 2) ? 'inline-block' : 'none';
     }
 
     // Hide navigation on Panel 5 (has its own buttons)
@@ -378,11 +378,11 @@ function updateContinueButton() {
 
     switch (currentPanel) {
         case 1:
-            continueButton.textContent = 'Try It';
+            continueButton.textContent = 'Continue';
             continueButton.disabled = false;
             break;
         case 2:
-            continueButton.textContent = hasTransformed ? 'Continue' : 'Skip';
+            continueButton.textContent = 'Continue';
             continueButton.disabled = false;
             break;
         case 3:
@@ -408,15 +408,7 @@ function updateContinueButton() {
 // ============================================
 
 function setupKeyboardNavigation() {
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'ArrowRight' || (event.key === 'Enter' && !event.target.matches('textarea, input'))) {
-            if (canProceed()) {
-                navigateNext();
-            }
-        } else if (event.key === 'ArrowLeft') {
-            navigateBack();
-        }
-    });
+    // Disabled - arrow keys were accidentally advancing panels
 }
 
 // ============================================

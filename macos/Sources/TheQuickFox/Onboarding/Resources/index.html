@@ -94,18 +94,9 @@
 
                 <!-- Panel 3: Unlock Global Access -->
                 <div class="panel" data-panel="3">
-                    <div class="panel-content">
-                        <div class="unlock-hero">
-                            <div class="keyboard-demo">
-                                <span class="key-visual large">
-                                    <span class="key-symbol">^</span>
-                                    <span class="key-text">control</span>
-                                </span>
-                                <span class="times-badge">x2</span>
-                            </div>
-                            <h1>Use it anywhere</h1>
-                            <p class="subtitle">Double-press Control in any app to summon TheQuickFox.</p>
-                        </div>
+                    <div class="panel-content centered">
+                        <h1>Enable Accessibility</h1>
+                        <p class="subtitle">Required for shortcut to work on any app.</p>
 
                         <div class="permission-card" id="accessibility-card">
                             <div class="permission-icon">
@@ -116,12 +107,18 @@
                             </div>
                             <div class="permission-info">
                                 <h3>Accessibility Access</h3>
-                                <p>Required to detect the double-Control shortcut globally</p>
+                                <p>Click Enable, then toggle on TheQuickFox</p>
                             </div>
                             <button class="permission-btn" id="accessibility-btn" onclick="grantPermission('accessibility')">Enable</button>
                         </div>
 
-                                            </div>
+                        <div class="permission-demo-video">
+                            <video autoplay loop muted playsinline>
+                                <source src="accessibility-permissions.mp4" type="video/mp4">
+                            </video>
+                        </div>
+                        <p class="video-caption">Find "TheQuickFox" and toggle it on</p>
+                    </div>
                 </div>
 
                 <!-- Panel 4: Email/TOS -->
@@ -174,14 +171,17 @@
                             <button class="primary-btn" onclick="showScreenInstructions()">Enable Screen Recording</button>
                         </div>
 
-                        <!-- Step 2: Show instructions GIF -->
+                        <!-- Step 2: Show instructions video -->
                         <div id="screen-instructions-state" style="display: none;">
                             <h1>Grant access in System Settings</h1>
                             <p class="subtitle">Find TheQuickFox in the list and toggle it on.</p>
 
-                            <div class="permission-demo-gif">
-                                <img src="screen-permissions.gif" alt="How to enable screen recording">
+                            <div class="permission-demo-video">
+                                <video autoplay loop muted playsinline>
+                                    <source src="screen-recording-permissions.mp4" type="video/mp4">
+                                </video>
                             </div>
+                            <p class="video-caption">Toggle on "TheQuickFox" in Screen Recording settings</p>
 
                             <button class="primary-btn" onclick="triggerScreenPermission()">Open System Settings</button>
                         </div>
@@ -246,8 +246,8 @@
                 <span class="dot" data-panel="5"></span>
             </div>
             <div class="nav-right">
-                <button class="nav-button skip-button" id="skip-btn" onclick="skipToPermissions()" style="display: none;">Skip</button>
-                <button class="nav-button continue-button" id="continue-btn" onclick="navigateNext()">Try It</button>
+                <button class="nav-button skip-button" id="skip-btn" onclick="skipToPermissions()">Skip</button>
+                <button class="nav-button continue-button" id="continue-btn" onclick="navigateNext()">Continue</button>
             </div>
         </div>
     </div>
@@ -255,6 +255,43 @@
     <!-- Confetti Canvas -->
     <canvas id="confetti-canvas"></canvas>
 
+    <!-- Video Zoom Modal -->
+    <div class="video-modal" id="video-modal" onclick="closeVideoModal()">
+        <button class="video-modal-close">Press anywhere to close</button>
+        <video id="modal-video" autoplay loop muted playsinline>
+            <source src="" type="video/mp4">
+        </video>
+    </div>
+
     <script src="app.js"></script>
+    <script>
+        // Video zoom functionality
+        function openVideoModal(videoSrc) {
+            const modal = document.getElementById('video-modal');
+            const modalVideo = document.getElementById('modal-video');
+            modalVideo.src = videoSrc;
+            modal.classList.add('visible');
+            modalVideo.play();
+        }
+
+        function closeVideoModal() {
+            const modal = document.getElementById('video-modal');
+            const modalVideo = document.getElementById('modal-video');
+            modal.classList.remove('visible');
+            modalVideo.pause();
+        }
+
+        // Add click handlers to permission videos
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.permission-demo-video').forEach(container => {
+                container.addEventListener('click', () => {
+                    const video = container.querySelector('video source');
+                    if (video) {
+                        openVideoModal(video.src);
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
