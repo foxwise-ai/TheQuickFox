@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'  # Triggers on tags like v1.0.1
 
+permissions:
+  contents: write  # Needed for GitHub Release uploads
+
 jobs:
   release:
     # runs-on: macos-latest
