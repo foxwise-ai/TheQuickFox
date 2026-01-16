@@ -18,7 +18,6 @@ let emailValid = false;
 let userEmail = '';
 let selectedTone = 'professional';
 let hasTransformed = false;  // Track if user has tried the transform
-let screenRecordingSkipped = false;
 
 
 // ============================================
@@ -174,13 +173,23 @@ window.updatePermissionStatus = function(status) {
         }
     }
 
-    // Update screen recording status text
+    // Update screen access button/card (panel 5)
+    const screenCard = document.getElementById('screen-card');
+    const screenBtn = document.getElementById('screen-btn');
     const screenStatusText = document.getElementById('screen-status-text');
-    if (screenStatusText) {
+    if (screenCard && screenBtn) {
         if (permissionsGranted.screenRecording) {
-            screenStatusText.textContent = 'Permission granted!';
+            screenCard.classList.add('granted');
+            screenBtn.textContent = 'Enabled';
+            screenBtn.classList.add('granted');
+            screenBtn.disabled = true;
+            if (screenStatusText) screenStatusText.textContent = 'Access granted!';
         } else {
-            screenStatusText.textContent = 'Waiting for permission...';
+            screenCard.classList.remove('granted');
+            screenBtn.textContent = 'Enable';
+            screenBtn.classList.remove('granted');
+            screenBtn.disabled = false;
+            if (screenStatusText) screenStatusText.textContent = 'Click Enable, then toggle on TheQuickFox';
         }
     }
 
@@ -195,38 +204,12 @@ window.updatePermissionStatus = function(status) {
     updateContinueButton();
 };
 
-function skipScreenRecording() {
-    screenRecordingSkipped = true;
-    sendMessage('track', { event: 'screen_recording_skipped' });
-    navigateNext();
-}
-
 function skipToPermissions() {
     currentPanel = 3;
     updateUI();
     sendMessage('track', { event: 'skipped_to_permissions' });
 }
 
-// Screen recording flow states
-function showScreenInstructions() {
-    document.getElementById('screen-explain-state').style.display = 'none';
-    document.getElementById('screen-instructions-state').style.display = 'block';
-
-    // Hide the nav buttons during this flow
-    document.querySelector('.navigation').style.display = 'none';
-
-    sendMessage('track', { event: 'screen_recording_instructions_shown' });
-}
-
-function triggerScreenPermission() {
-    document.getElementById('screen-instructions-state').style.display = 'none';
-    document.getElementById('screen-waiting-state').style.display = 'block';
-
-    // Now trigger the actual permission request
-    sendMessage('requestPermissions', { type: 'screenRecording' });
-
-    sendMessage('track', { event: 'screen_recording_permission_triggered' });
-}
 
 // ============================================
 // Email & Terms Validation
@@ -342,10 +325,10 @@ function updateUI() {
         skipButton.style.display = (currentPanel === 1 || currentPanel === 2) ? 'inline-block' : 'none';
     }
 
-    // Hide navigation on Panel 5 (has its own buttons)
+    // Show navigation on all panels
     const navigation = document.querySelector('.navigation');
     if (navigation) {
-        navigation.style.display = currentPanel === 5 ? 'none' : 'flex';
+        navigation.style.display = 'flex';
     }
 
     updateContinueButton();
@@ -367,8 +350,8 @@ function updateUI() {
         }, 500);
     }
 
-    if (currentPanel === 3 || currentPanel === 4) {
-        // Start permission monitoring
+    if (currentPanel === 3 || currentPanel === 5) {
+        // Start permission monitoring for permission panels
         sendMessage('startPermissionMonitoring', {});
     }
 }
@@ -418,26 +401,11 @@ function setupKeyboardNavigation() {
 function completeOnboarding() {
     sendMessage('completeOnboarding', { email: userEmail });
 
-    // Hide all screen recording states, show success
-    const explainState = document.getElementById('screen-explain-state');
-    const instructionsState = document.getElementById('screen-instructions-state');
-    const waitingState = document.getElementById('screen-waiting-state');
-    const successState = document.getElementById('success-state');
-
-    if (explainState) explainState.style.display = 'none';
-    if (instructionsState) instructionsState.style.display = 'none';
-    if (waitingState) waitingState.style.display = 'none';
-    if (successState) successState.style.display = 'block';
-
-    // Hide navigation buttons
-    document.querySelector('.navigation').style.display = 'none';
-
     // Fire confetti!
     fireConfetti();
 
     sendMessage('track', { event: 'onboarding_completed', props: {
         has_screen_recording: permissionsGranted.screenRecording,
-        skipped_screen_recording: screenRecordingSkipped,
         tried_transform: hasTransformed
     }});
 }

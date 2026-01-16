@@ -101,8 +101,9 @@
                         <div class="permission-card" id="accessibility-card">
                             <div class="permission-icon">
                                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                                    <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" stroke-width="2"/>
-                                    <path d="M2 12C2 12 5 5 12 5C19 5 22 12 22 12C22 12 19 19 12 19C5 19 2 12 2 12Z" stroke="currentColor" stroke-width="2"/>
+                                    <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M6 10H8M10 10H12M14 10H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    <path d="M8 14H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
                             </div>
                             <div class="permission-info">
@@ -152,84 +153,33 @@
                     </div>
                 </div>
 
-                <!-- Panel 5: Screen Recording + Success -->
+                <!-- Panel 5: Context Awareness -->
                 <div class="panel" data-panel="5">
                     <div class="panel-content centered">
-                        <!-- Step 1: Explain screen recording -->
-                        <div id="screen-explain-state">
-                            <div class="feature-icon-large">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                        <h1>Enable Context Awareness</h1>
+                        <p class="subtitle">Get AI responses based on what's on your screen. No copy-paste needed.</p>
+
+                        <div class="permission-card" id="screen-card">
+                            <div class="permission-icon">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
                                     <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
                                     <path d="M8 21H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                     <path d="M12 17V21" stroke="currentColor" stroke-width="2"/>
-                                    <circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="2"/>
                                 </svg>
                             </div>
-                            <h1>One last step</h1>
-                            <p class="subtitle">TheQuickFox needs screen access to see what you're working on and give context-aware responses.</p>
-
-                            <button class="primary-btn" onclick="showScreenInstructions()">Enable Screen Recording</button>
+                            <div class="permission-info">
+                                <h3>Screen Context</h3>
+                                <p id="screen-status-text">Click Enable, then toggle on TheQuickFox</p>
+                            </div>
+                            <button class="permission-btn" id="screen-btn" onclick="grantPermission('screenRecording')">Enable</button>
                         </div>
 
-                        <!-- Step 2: Show instructions video -->
-                        <div id="screen-instructions-state" style="display: none;">
-                            <h1>Grant access in System Settings</h1>
-                            <p class="subtitle">Find TheQuickFox in the list and toggle it on.</p>
-
-                            <div class="permission-demo-video">
-                                <video autoplay loop muted playsinline>
-                                    <source src="screen-recording-permissions.mp4" type="video/mp4">
-                                </video>
-                            </div>
-                            <p class="video-caption">Toggle on "TheQuickFox" in Screen Recording settings</p>
-
-                            <button class="primary-btn" onclick="triggerScreenPermission()">Open System Settings</button>
+                        <div class="permission-demo-video">
+                            <video autoplay loop muted playsinline>
+                                <source src="screen-recording-permissions.mp4" type="video/mp4">
+                            </video>
                         </div>
-
-                        <!-- Step 3: Waiting for permission -->
-                        <div id="screen-waiting-state" style="display: none;">
-                            <h1>Waiting for permission...</h1>
-                            <p class="subtitle">Toggle on TheQuickFox in System Settings, then return here.</p>
-
-                            <div class="permission-card granted" id="screen-card">
-                                <div class="permission-icon">
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                                        <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
-                                        <path d="M8 21H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                        <path d="M12 17V21" stroke="currentColor" stroke-width="2"/>
-                                    </svg>
-                                </div>
-                                <div class="permission-info">
-                                    <h3>Screen Recording</h3>
-                                    <p id="screen-status-text">Checking...</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Step 4: Success -->
-                        <div id="success-state" style="display: none;">
-                            <div class="success-icon">
-                                <svg width="80" height="80" viewBox="0 0 24 24" fill="none">
-                                    <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </div>
-                            <h1>You're all set!</h1>
-                            <p class="subtitle">TheQuickFox is ready to use.</p>
-
-                            <div class="next-step">
-                                <div class="keyboard-hint">
-                                    <span class="key-visual">
-                                        <span class="key-symbol">^</span>
-                                        <span class="key-text">control</span>
-                                    </span>
-                                    <span class="times-badge">x2</span>
-                                </div>
-                                <p class="hint-text">Press Control twice in any app to summon TheQuickFox</p>
-                            </div>
-
-                            <button class="close-btn" onclick="closeOnboarding()">Close</button>
-                        </div>
+                        <p class="video-caption">Find "TheQuickFox" and toggle it on</p>
                     </div>
                 </div>
             </div>
@@ -256,11 +206,12 @@
     <canvas id="confetti-canvas"></canvas>
 
     <!-- Video Zoom Modal -->
-    <div class="video-modal" id="video-modal" onclick="closeVideoModal()">
-        <button class="video-modal-close">Press anywhere to close</button>
+    <div class="video-modal" id="video-modal">
+        <button class="video-modal-close-x" onclick="closeVideoModal()">✕</button>
         <video id="modal-video" autoplay loop muted playsinline>
             <source src="" type="video/mp4">
         </video>
+        <button class="video-modal-close-btn" onclick="closeVideoModal()">Close</button>
     </div>
 
     <script src="app.js"></script>

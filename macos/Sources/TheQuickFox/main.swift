@@ -345,6 +345,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let hasAccessibility = PermissionsState.shared.checkAccessibilityPermission()
             let hasScreenRecording = PermissionsState.shared.checkScreenRecordingPermission()
 
+            print("🔍 Post-restart check - accessibility: \(hasAccessibility), screenRecording: \(hasScreenRecording)")
+
             if hasAccessibility && hasScreenRecording {
                 print("🎉 Post-restart detected with all permissions - showing completion screen")
                 // Clear the flag
@@ -361,6 +363,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Show completion screen
                 DispatchQueue.main.async { [weak self] in
                     self?.showCompletionScreen()
+                }
+            } else if hasAccessibility {
+                // Screen recording not detected yet - retry after a short delay
+                // macOS sometimes needs a moment after restart to report permission correctly
+                print("⏳ Screen recording not detected yet, retrying in 1 second...")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    let retryScreenRecording = PermissionsState.shared.checkScreenRecordingPermission()
+                    print("🔍 Retry check - screenRecording: \(retryScreenRecording)")
+
+                    if retryScreenRecording {
+                        print("🎉 Screen recording now granted - showing completion screen")
+                        UserDefaults.standard.set(false, forKey: needsPostRestartScreenKey)
+
+                        let _ = HUDManager.shared
+                        setupDoubleControlDetector()
+
+                        self?.showCompletionScreen()
+                    } else {
+                        // Still not granted - show onboarding
+                        print("⚠️ Screen recording still not granted - showing onboarding")
+                        UserDefaults.standard.set(false, forKey: needsPostRestartScreenKey)
+                        self?.showOnboardingWithPermissionsError()
+                    }
                 }
             } else {
                 // Permissions not granted yet - show onboarding with error

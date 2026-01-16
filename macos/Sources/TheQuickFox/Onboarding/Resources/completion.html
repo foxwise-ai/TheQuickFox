@@ -112,12 +112,12 @@
             line-height: 1.5;
         }
 
-        /* Running apps list */
+        /* Running apps list - simple inline icons */
         .running-apps {
             display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
+            gap: 16px;
             justify-content: center;
+            align-items: center;
             margin: 24px 0;
         }
 
@@ -125,47 +125,42 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
-            padding: 12px;
-            border-radius: 12px;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            cursor: default;
-            min-width: 80px;
+            gap: 4px;
         }
 
         .app-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 10px;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
         }
 
         .app-name {
-            font-size: 11px;
-            color: var(--text-secondary);
+            font-size: 10px;
+            color: var(--text-tertiary);
             text-align: center;
-            max-width: 70px;
+            max-width: 60px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
 
         .close-btn {
-            background: var(--accent);
+            background: linear-gradient(135deg, var(--gradient-start, #667eea), var(--gradient-end, #764ba2));
             color: white;
             border: none;
-            padding: 14px 40px;
-            border-radius: 10px;
-            font-size: 16px;
+            padding: 16px 48px;
+            border-radius: 12px;
+            font-size: 17px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
-            margin-top: 20px;
+            margin-top: 24px;
+            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
         }
 
         .close-btn:hover {
-            background: var(--accent-hover);
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
         }
     </style>
 </head>
@@ -182,9 +177,7 @@
                 </svg>
             </div>
             <h1>You're all set!</h1>
-            <p class="subtitle">Try it on one of your open apps:</p>
-
-            <div class="running-apps" id="running-apps"></div>
+            <p class="subtitle">Try the shortcut now:</p>
 
             <div class="keyboard-demo-large pulse-animation">
                 <span class="key-visual">
@@ -205,12 +198,10 @@
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
                 </svg>
             </div>
-            <h1>It works!</h1>
-            <p class="subtitle">Now try it in one of your apps:</p>
+            <h1>You got it! 🎉</h1>
+            <p class="subtitle">Now use it in any of your apps — just remember the shortcut:</p>
 
-            <div class="running-apps" id="running-apps-success"></div>
-
-            <div class="keyboard-demo-large" style="margin: 20px 0;">
+            <div class="keyboard-demo-large" style="margin: 24px 0;">
                 <span class="key-visual">
                     <span class="key-symbol">^</span>
                     <span class="key-text">control</span>
@@ -218,7 +209,9 @@
                 <span class="times-badge">x2</span>
             </div>
 
-            <button class="close-btn" onclick="closeWindow()">Got it</button>
+            <div class="running-apps" id="running-apps-success"></div>
+
+            <button class="close-btn" onclick="closeWindow()">Start using TheQuickFox</button>
         </div>
     </div>
 
@@ -289,7 +282,7 @@
             document.body.classList.toggle('dark-mode', mode === 'dark');
         };
 
-        // Receive running apps from Swift
+        // Receive running apps from Swift (only shown in success state)
         window.setRunningApps = function(apps) {
             if (!apps || apps.length === 0) return;
 
@@ -300,11 +293,9 @@
                 </div>
             `).join('');
 
-            // Populate both containers
-            const container1 = document.getElementById('running-apps');
-            const container2 = document.getElementById('running-apps-success');
-            if (container1) container1.innerHTML = html;
-            if (container2) container2.innerHTML = html;
+            // Only populate success container (apps shown after Control+Control works)
+            const container = document.getElementById('running-apps-success');
+            if (container) container.innerHTML = html;
         };
 
         // Confetti animation (same as onboarding)

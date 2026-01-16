@@ -726,22 +726,50 @@ h1 {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-.video-modal-close {
+.video-modal-close-x {
     position: absolute;
     top: 20px;
     right: 20px;
     color: white;
-    font-size: 14px;
+    font-size: 32px;
+    font-weight: 300;
     background: rgba(255, 255, 255, 0.2);
     border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: background 0.2s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.video-modal-close:hover {
+.video-modal-close-x:hover {
     background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.video-modal-close-btn {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-size: 18px;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--gradient-start, #667eea), var(--gradient-end, #764ba2));
+    border: none;
+    padding: 14px 48px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+}
+
+.video-modal-close-btn:hover {
+    transform: translateX(-50%) translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
 }
 
 
