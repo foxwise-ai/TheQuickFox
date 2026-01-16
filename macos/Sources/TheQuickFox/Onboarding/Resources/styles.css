@@ -622,6 +622,68 @@ h1 {
     margin-bottom: 24px;
 }
 
+.success-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100px;
+    height: 100px;
+    background-color: var(--success-color);
+    border-radius: 50%;
+    color: white;
+    margin-bottom: 24px;
+    animation: scaleIn 0.4s ease;
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.next-step {
+    margin: 32px 0;
+    padding: 24px;
+    background-color: var(--bg-secondary);
+    border-radius: 16px;
+}
+
+.keyboard-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.hint-text {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.close-btn {
+    padding: 14px 48px;
+    border: none;
+    border-radius: 10px;
+    background-color: var(--button-bg);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background-color: var(--button-hover);
+    transform: translateY(-1px);
+}
+
 .email-form {
     margin: 24px 0;
 }
