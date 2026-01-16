@@ -8,6 +8,13 @@
 import Cocoa
 import Combine
 
+// MARK: - Notification Names
+
+extension NSNotification.Name {
+    /// Posted when the HUD appears on screen
+    static let hudDidAppear = NSNotification.Name("com.foxwiseai.thequickfox.hudDidAppear")
+}
+
 /// HUD manager that coordinates between the AppStore and UI
 @MainActor
 final class HUDManager: ObservableObject {
@@ -98,6 +105,9 @@ final class HUDManager: ObservableObject {
         // Direct UI call - no action dispatch to avoid loops
         if !store.hudState.isVisible {
             hudViewController.presentHUD()
+
+            // Notify observers that HUD appeared (used by completion screen)
+            NotificationCenter.default.post(name: .hudDidAppear, object: nil)
         }
     }
 

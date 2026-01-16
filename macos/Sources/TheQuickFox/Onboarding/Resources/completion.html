@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheQuickFox - Ready!</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Completion-specific styles */
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .completion-container {
+            text-align: center;
+            max-width: 500px;
+            padding: 40px;
+        }
+
+        .keyboard-demo-large {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin: 40px 0;
+        }
+
+        .keyboard-demo-large .key-visual {
+            width: 80px;
+            height: 60px;
+            font-size: 14px;
+        }
+
+        .keyboard-demo-large .key-symbol {
+            font-size: 24px;
+        }
+
+        .keyboard-demo-large .times-badge {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .pulse-animation {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        .hint-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 20px;
+            min-height: 20px;
+            transition: opacity 0.3s ease;
+        }
+
+        .hint-text.visible {
+            opacity: 1;
+        }
+
+        .hint-text.hidden {
+            opacity: 0;
+        }
+
+        /* Success state */
+        .success-container {
+            display: none;
+        }
+
+        .success-container.visible {
+            display: block;
+        }
+
+        .try-container.hidden {
+            display: none;
+        }
+
+        .success-icon {
+            color: var(--accent);
+            margin-bottom: 20px;
+        }
+
+        .next-steps {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .next-steps h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .next-steps p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .close-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 14px 40px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 20px;
+        }
+
+        .close-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="completion-container">
+        <!-- Try It State -->
+        <div class="try-container" id="try-container">
+            <div class="success-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                </svg>
+            </div>
+            <h1>You're all set!</h1>
+            <p class="subtitle">Now let's try it out.</p>
+
+            <div class="keyboard-demo-large pulse-animation">
+                <span class="key-visual">
+                    <span class="key-symbol">^</span>
+                    <span class="key-text">control</span>
+                </span>
+                <span class="times-badge">x2</span>
+            </div>
+
+            <p class="subtitle">Press Control twice quickly</p>
+
+            <p class="hint-text hidden" id="hint-text">Try pressing a bit faster!</p>
+        </div>
+
+        <!-- Success State -->
+        <div class="success-container" id="success-container">
+            <div class="success-icon">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                </svg>
+            </div>
+            <h1>It works!</h1>
+            <p class="subtitle">TheQuickFox is ready to use.</p>
+
+            <div class="next-steps">
+                <h3>What's next?</h3>
+                <p>Open any app - email, Slack, browser, notes - and press Control twice to summon TheQuickFox. It sees what's on your screen and helps you write.</p>
+            </div>
+
+            <button class="close-btn" onclick="closeWindow()">Got it</button>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let hasShownHint = false;
+        let hintTimer = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Start hint timer
+            startHintTimer();
+
+            // Set system appearance
+            if (window.setSystemAppearance) {
+                // Will be called from Swift
+            }
+        });
+
+        function startHintTimer() {
+            // Show hint after 5 seconds if HUD hasn't appeared
+            hintTimer = setTimeout(() => {
+                if (!hasShownHint) {
+                    showHint();
+                }
+            }, 5000);
+        }
+
+        function showHint() {
+            hasShownHint = true;
+            const hintText = document.getElementById('hint-text');
+            hintText.classList.remove('hidden');
+            hintText.classList.add('visible');
+        }
+
+        // Called from Swift when HUD appears
+        window.onHUDAppeared = function() {
+            // Clear hint timer
+            if (hintTimer) {
+                clearTimeout(hintTimer);
+            }
+
+            // Transition to success state
+            document.getElementById('try-container').classList.add('hidden');
+            document.getElementById('success-container').classList.add('visible');
+
+            // Fire confetti!
+            fireConfetti();
+        };
+
+        function closeWindow() {
+            sendMessage('closeWindow', {});
+        }
+
+        function sendMessage(action, data = {}) {
+            if (window.webkit && window.webkit.messageHandlers.onboarding) {
+                window.webkit.messageHandlers.onboarding.postMessage({
+                    action,
+                    ...data
+                });
+            } else {
+                console.log('Swift bridge not available:', action, data);
+            }
+        }
+
+        // System appearance
+        window.setSystemAppearance = function(mode) {
+            document.body.classList.toggle('dark-mode', mode === 'dark');
+        };
+
+        // Confetti animation (same as onboarding)
+        function fireConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const particles = [];
+            const particleCount = 150;
+            const colors = ['#667eea', '#764ba2', '#ff9500', '#34c759', '#007aff', '#ff3b30'];
+
+            class Particle {
+                constructor() {
+                    this.x = Math.random() * canvas.width;
+                    this.y = -10;
+                    this.size = Math.random() * 8 + 4;
+                    this.speedY = Math.random() * 3 + 2;
+                    this.speedX = Math.random() * 4 - 2;
+                    this.color = colors[Math.floor(Math.random() * colors.length)];
+                    this.rotation = Math.random() * 360;
+                    this.rotationSpeed = Math.random() * 10 - 5;
+                    this.opacity = 1;
+                }
+
+                update() {
+                    this.y += this.speedY;
+                    this.x += this.speedX;
+                    this.rotation += this.rotationSpeed;
+                    this.speedY += 0.1;
+
+                    if (this.y > canvas.height - 100) {
+                        this.opacity -= 0.02;
+                    }
+                }
+
+                draw() {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.rotation * Math.PI / 180);
+                    ctx.fillStyle = this.color;
+                    ctx.globalAlpha = this.opacity;
+                    ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size / 2);
+                    ctx.restore();
+                }
+            }
+
+            for (let i = 0; i < particleCount; i++) {
+                setTimeout(() => {
+                    particles.push(new Particle());
+                }, i * 20);
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                particles.forEach((particle, index) => {
+                    particle.update();
+                    particle.draw();
+
+                    if (particle.opacity <= 0) {
+                        particles.splice(index, 1);
+                    }
+                });
+
+                if (particles.length > 0) {
+                    requestAnimationFrame(animate);
+                }
+            }
+
+            animate();
+        }
+    </script>
+</body>
+</html>

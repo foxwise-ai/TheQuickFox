@@ -174,21 +174,22 @@ window.updatePermissionStatus = function(status) {
         }
     }
 
-    // Update screen recording button/card (panel 4)
-    const screenCard = document.getElementById('screen-card');
-    const screenBtn = document.getElementById('screen-btn');
-    if (screenCard && screenBtn) {
+    // Update screen recording status text
+    const screenStatusText = document.getElementById('screen-status-text');
+    if (screenStatusText) {
         if (permissionsGranted.screenRecording) {
-            screenCard.classList.add('granted');
-            screenBtn.textContent = 'Enabled';
-            screenBtn.classList.add('granted');
-            screenBtn.disabled = true;
+            screenStatusText.textContent = 'Permission granted!';
         } else {
-            screenCard.classList.remove('granted');
-            screenBtn.textContent = 'Enable';
-            screenBtn.classList.remove('granted');
-            screenBtn.disabled = false;
+            screenStatusText.textContent = 'Waiting for permission...';
         }
+    }
+
+    // If screen recording granted while on panel 5, auto-complete
+    if (currentPanel === 5 && permissionsGranted.screenRecording) {
+        // Small delay to let user see the "granted" state
+        setTimeout(() => {
+            completeOnboarding();
+        }, 500);
     }
 
     updateContinueButton();
@@ -204,6 +205,27 @@ function skipToPermissions() {
     currentPanel = 3;
     updateUI();
     sendMessage('track', { event: 'skipped_to_permissions' });
+}
+
+// Screen recording flow states
+function showScreenInstructions() {
+    document.getElementById('screen-explain-state').style.display = 'none';
+    document.getElementById('screen-instructions-state').style.display = 'block';
+
+    // Hide the nav buttons during this flow
+    document.querySelector('.navigation').style.display = 'none';
+
+    sendMessage('track', { event: 'screen_recording_instructions_shown' });
+}
+
+function triggerScreenPermission() {
+    document.getElementById('screen-instructions-state').style.display = 'none';
+    document.getElementById('screen-waiting-state').style.display = 'block';
+
+    // Now trigger the actual permission request
+    sendMessage('requestPermissions', { type: 'screenRecording' });
+
+    sendMessage('track', { event: 'screen_recording_permission_triggered' });
 }
 
 // ============================================
@@ -244,6 +266,12 @@ function openPrivacyPolicy(event) {
 
 function navigateNext() {
     if (currentPanel < totalPanels) {
+        // When leaving Panel 4 (email/TOS), save onboarding progress early
+        // This ensures the flag is set before screen recording (which may restart the app)
+        if (currentPanel === 4 && termsAccepted && emailValid) {
+            sendMessage('saveOnboardingProgress', { email: userEmail });
+        }
+
         currentPanel++;
         updateUI();
         sendMessage('track', { event: 'panel_view', props: { panel: currentPanel } });
@@ -271,9 +299,9 @@ function canProceed() {
         case 3:
             return permissionsGranted.accessibility;  // Must grant accessibility
         case 4:
-            return permissionsGranted.screenRecording;  // Must grant screen recording
+            return termsAccepted && emailValid;  // Must accept terms and enter email
         case 5:
-            return canComplete();
+            return permissionsGranted.screenRecording;  // Must grant screen recording
         default:
             return true;
     }
@@ -308,10 +336,16 @@ function updateUI() {
     // Show/hide back button
     backButton.style.visibility = currentPanel === 1 ? 'hidden' : 'visible';
 
-    // Show/hide skip button (only on Panel 2)
+    // Hide skip button (no longer used - continue button handles Skip/Continue toggle)
     const skipButton = document.getElementById('skip-btn');
     if (skipButton) {
-        skipButton.style.display = currentPanel === 2 ? 'block' : 'none';
+        skipButton.style.display = 'none';
+    }
+
+    // Hide navigation on Panel 5 (has its own buttons)
+    const navigation = document.querySelector('.navigation');
+    if (navigation) {
+        navigation.style.display = currentPanel === 5 ? 'none' : 'flex';
     }
 
     updateContinueButton();
@@ -349,11 +383,11 @@ function updateContinueButton() {
             break;
         case 4:
             continueButton.textContent = 'Continue';
-            continueButton.disabled = !permissionsGranted.screenRecording;  // Must grant screen recording
+            continueButton.disabled = !(termsAccepted && emailValid);  // Must accept terms and email
             break;
         case 5:
-            continueButton.textContent = 'Get Started';
-            continueButton.disabled = !canComplete();
+            continueButton.textContent = 'Finish';
+            continueButton.disabled = !permissionsGranted.screenRecording;  // Must grant screen recording
             break;
         default:
             continueButton.textContent = 'Continue';
@@ -384,6 +418,20 @@ function setupKeyboardNavigation() {
 function completeOnboarding() {
     sendMessage('completeOnboarding', { email: userEmail });
 
+    // Hide all screen recording states, show success
+    const explainState = document.getElementById('screen-explain-state');
+    const instructionsState = document.getElementById('screen-instructions-state');
+    const waitingState = document.getElementById('screen-waiting-state');
+    const successState = document.getElementById('success-state');
+
+    if (explainState) explainState.style.display = 'none';
+    if (instructionsState) instructionsState.style.display = 'none';
+    if (waitingState) waitingState.style.display = 'none';
+    if (successState) successState.style.display = 'block';
+
+    // Hide navigation buttons
+    document.querySelector('.navigation').style.display = 'none';
+
     // Fire confetti!
     fireConfetti();
 
@@ -392,6 +440,10 @@ function completeOnboarding() {
         skipped_screen_recording: screenRecordingSkipped,
         tried_transform: hasTransformed
     }});
+}
+
+function closeOnboarding() {
+    sendMessage('closeWindow', {});
 }
 
 // ============================================

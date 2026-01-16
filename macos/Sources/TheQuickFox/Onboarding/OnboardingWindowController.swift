@@ -23,6 +23,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private let headerHeight: CGFloat = 70
     private var shouldShowPermissionsError = false
     private var shouldShowTOSError = false
+    private var isCompletionMode = false
     var permissionStatusTimer: Timer?
 
 
@@ -68,7 +69,11 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         // Clean up timer when window is about to close
         permissionStatusTimer?.invalidate()
         permissionStatusTimer = nil
-        print("🧹 Window closing - timer cleaned up")
+
+        // Remove HUD notification observer
+        NotificationCenter.default.removeObserver(self, name: .hudDidAppear, object: nil)
+
+        print("🧹 Window closing - timer and observers cleaned up")
     }
 
     // MARK: - Setup
@@ -288,16 +293,89 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Show the completion screen after app restart (post screen recording permission)
+    func showCompletionMode() {
+        isCompletionMode = true
+
+        // Load completion.html instead of index.html
+        loadCompletionContent()
+
+        // Listen for HUD appearing
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHUDAppeared),
+            name: .hudDidAppear,
+            object: nil
+        )
+
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func handleHUDAppeared() {
+        print("🎉 HUD appeared - notifying completion screen")
+        // Call JS to transition to success state
+        webView?.evaluateJavaScript("window.onHUDAppeared();") { _, error in
+            if let error = error {
+                print("❌ Failed to notify JS of HUD appearance: \(error)")
+            }
+        }
+    }
+
+    private func loadCompletionContent() {
+        let fileManager = FileManager.default
+        var htmlURL: URL?
+        var baseURL: URL?
+
+        print("🔄 Loading completion content...")
+
+        let possiblePaths = [
+            Bundle.main.resourceURL?.appendingPathComponent("Onboarding/completion.html"),
+            Bundle.main.bundleURL.deletingLastPathComponent()
+                .appendingPathComponent("TheQuickFox_TheQuickFox.resources/Onboarding/completion.html"),
+            URL(fileURLWithPath: fileManager.currentDirectoryPath)
+                .appendingPathComponent("Sources/TheQuickFox/Onboarding/Resources/completion.html"),
+        ]
+
+        for path in possiblePaths.compactMap({ $0 }) {
+            print("🔍 Checking path: \(path.path)")
+            if fileManager.fileExists(atPath: path.path) {
+                htmlURL = path
+                baseURL = path.deletingLastPathComponent()
+                print("✅ Found completion HTML at: \(path.path)")
+                break
+            }
+        }
+
+        guard let finalURL = htmlURL, let finalBaseURL = baseURL else {
+            print("❌ Could not find completion HTML file")
+            return
+        }
+
+        webView.loadFileURL(finalURL, allowingReadAccessTo: finalBaseURL)
+    }
+
+    /// Show completion content immediately without header animation
+    private func showCompletionContent() {
+        print("🎉 Showing completion content")
+
+        // Hide the loading view
+        loadingView.isHidden = true
+
+        // Expand web view to fill the container (no header needed)
+        webView.frame = containerView.bounds
+        webView.alphaValue = 1
+    }
+
     // MARK: - Permission Status Updates
 
     /// Track if we've already checked screen recording to avoid repeated dialogs
     private var hasCheckedScreenRecording = false
 
     /// Update permission status in JS - panel-aware to avoid triggering unwanted dialogs
-    /// Panel 3 = Accessibility only, Panel 4 = Screen Recording
+    /// Panel 3 = Accessibility, Panel 4 = Email/TOS (no permissions), Panel 5 = Screen Recording
     private func updatePermissionStatus(forPanel panel: Int) {
         // Only check the permission relevant to the current panel
-        // This avoids triggering the screen recording dialog on Panel 3
         let accessibilityGranted = PermissionsState.shared.checkAccessibilityPermission()
 
         // For screen recording, only use cached value to avoid triggering the dialog repeatedly
@@ -377,7 +455,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             self.updatePermissionStatus(forPanel: panel)
         }
 
-        // Update permission status every second while on a permissions page (panel 3 or 4)
+        // Update permission status every second while on a permissions page (panel 3 or 5)
         permissionStatusTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
             guard let self = self else {
                 timer.invalidate()
@@ -386,8 +464,8 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
             // Check which panel we're on
             self.webView?.evaluateJavaScript("window.currentPanel") { result, error in
-                if let panel = result as? Int, panel == 3 || panel == 4 {
-                    // Only update for permission panels
+                if let panel = result as? Int, panel == 3 || panel == 5 {
+                    // Only update for permission panels (3 = Accessibility, 5 = Screen Recording)
                     self.updatePermissionStatus(forPanel: panel)
                 } else {
                     // Stop timer when leaving permission panels
@@ -597,6 +675,14 @@ extension OnboardingWindowController: WKNavigationDelegate {
         let script = "window.setSystemAppearance('\(isDarkMode ? "dark" : "light")')"
         webView.evaluateJavaScript(script)
 
+        // For completion mode, just show the content immediately (no header animation)
+        if isCompletionMode {
+            DispatchQueue.main.async { [weak self] in
+                self?.showCompletionContent()
+            }
+            return
+        }
+
         // Don't check permissions on initial load - wait until user reaches permissions page
         // Just set initial state to false
         let initialScript = """
@@ -675,6 +761,14 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
                     self.handleComposeDemo(input: input, tone: tone)
                 }
 
+            case "closeWindow":
+                self.windowController?.window?.close()
+
+            case "saveOnboardingProgress":
+                // Save onboarding progress early (before screen recording which may restart app)
+                let email = body["email"] as? String
+                self.handleSaveOnboardingProgress(email: email)
+
             default:
                 print("Unknown onboarding action: \(action)")
             }
@@ -713,10 +807,12 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
         }
     }
 
-    private func handleCompleteOnboarding(email: String?) {
-        print("✅ Onboarding completed - accepting terms with email: \(email ?? "none")")
+    /// Save onboarding progress early - called when user completes email/TOS step
+    /// This ensures the flag is set before screen recording permission (which may restart the app)
+    private func handleSaveOnboardingProgress(email: String?) {
+        print("💾 Saving onboarding progress - email: \(email ?? "none")")
 
-        // Accept terms of service when onboarding completes
+        // Accept terms of service
         if let email = email, !email.isEmpty {
             Task {
                 do {
@@ -724,15 +820,30 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
                     print("✅ Terms of service accepted for email: \(email)")
                 } catch {
                     print("❌ Failed to accept terms: \(error)")
-                    // Continue anyway since onboarding is complete
                 }
             }
-        } else {
-            print("⚠️ No email provided during onboarding")
         }
 
-        // Mark onboarding as completed
+        // Mark onboarding as completed EARLY (before screen recording step)
         UserDefaults.standard.set(true, forKey: "com.foxwiseai.thequickfox.onboardingCompleted")
+
+        // Set flag to show completion screen after potential restart
+        UserDefaults.standard.set(true, forKey: "com.foxwiseai.thequickfox.needsPostRestartScreen")
+
+        UserDefaults.standard.synchronize() // Force immediate write to disk
+
+        print("✅ Onboarding progress saved to UserDefaults (with post-restart flag)")
+    }
+
+    private func handleCompleteOnboarding(email: String?) {
+        print("✅ Onboarding completed")
+
+        // Onboarding flag should already be set by saveOnboardingProgress
+        // But set it again just in case
+        UserDefaults.standard.set(true, forKey: "com.foxwiseai.thequickfox.onboardingCompleted")
+
+        // Clear the post-restart flag since we completed normally
+        UserDefaults.standard.set(false, forKey: "com.foxwiseai.thequickfox.needsPostRestartScreen")
 
         // Stop the permission status timer
         windowController?.permissionStatusTimer?.invalidate()
@@ -741,11 +852,12 @@ private final class OnboardingMessageHandler: NSObject, WKScriptMessageHandler {
         // Setup the double control detector now that onboarding is complete
         setupDoubleControlDetector()
 
-        // Delay closing to let confetti animation play
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            if let window = NSApp.keyWindow, window.title == "TheQuickFox" {
-                window.close()
-            }
+        // Window stays open - user closes it manually via the Close button
+    }
+
+    private func handleCloseWindow() {
+        if let window = NSApp.keyWindow, window.title == "TheQuickFox" {
+            window.close()
         }
     }
 

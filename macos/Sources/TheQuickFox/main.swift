@@ -141,6 +141,7 @@ var showInDock = true
 
 // UserDefaults keys
 let onboardingCompletedKey = "com.foxwiseai.thequickfox.onboardingCompleted"
+let needsPostRestartScreenKey = "com.foxwiseai.thequickfox.needsPostRestartScreen"
 
 // Set app delegate first
 NSApp.delegate = AppDelegate.shared
@@ -325,12 +326,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Check if onboarding has been completed
         let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingCompletedKey)
+        let needsPostRestartScreen = UserDefaults.standard.bool(forKey: needsPostRestartScreenKey)
 
         if !hasCompletedOnboarding {
             // First launch - show onboarding
             print("🎯 First launch detected - showing onboarding")
             DispatchQueue.main.async { [weak self] in
                 self?.showOnboarding()
+            }
+        } else if needsPostRestartScreen {
+            // Post-restart after screen recording permission - show completion screen
+            let hasAccessibility = PermissionsState.shared.checkAccessibilityPermission()
+            let hasScreenRecording = PermissionsState.shared.checkScreenRecordingPermission()
+
+            if hasAccessibility && hasScreenRecording {
+                print("🎉 Post-restart detected with all permissions - showing completion screen")
+                // Clear the flag
+                UserDefaults.standard.set(false, forKey: needsPostRestartScreenKey)
+
+                // Setup event detector first so double-control works
+                setupDoubleControlDetector()
+
+                // Show completion screen
+                DispatchQueue.main.async { [weak self] in
+                    self?.showCompletionScreen()
+                }
+            } else {
+                // Permissions not granted yet - show onboarding with error
+                print("⚠️ Post-restart but permissions missing - showing onboarding")
+                UserDefaults.standard.set(false, forKey: needsPostRestartScreenKey)
+                DispatchQueue.main.async { [weak self] in
+                    self?.showOnboardingWithPermissionsError()
+                }
             }
         } else {
             // Check accessibility permission (this doesn't trigger a dialog)
@@ -444,6 +471,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func showOnboarding() {
         onboardingWindowController = OnboardingWindowController()
         onboardingWindowController?.show()
+    }
+
+    @objc func showCompletionScreen() {
+        onboardingWindowController = OnboardingWindowController()
+        onboardingWindowController?.showCompletionMode()
     }
 
     @objc func showOnboardingWithPermissionsError() {

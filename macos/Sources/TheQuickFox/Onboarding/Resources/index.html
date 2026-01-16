@@ -103,67 +103,89 @@
                                             </div>
                 </div>
 
-                <!-- Panel 4: Screen Context -->
+                <!-- Panel 4: Email/TOS -->
                 <div class="panel" data-panel="4">
-                    <div class="panel-content">
-                        <h1>Context-aware AI</h1>
-                        <p class="subtitle">TheQuickFox can see your screen to give smarter answers.</p>
+                    <div class="panel-content centered">
+                        <div class="ready-icon">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                                <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <h1>Almost there</h1>
+                        <p class="subtitle">One last thing to activate your free trial.</p>
 
-                        <div class="permission-demo-gif">
-                            <img src="screen-permissions.gif" alt="How to enable screen recording">
+                        <div class="email-form">
+                            <input type="email" id="email-field" placeholder="your@email.com" oninput="updateEmailValidity()">
                         </div>
 
-                        <div class="permission-card" id="screen-card">
-                            <div class="permission-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                        <div class="terms-row">
+                            <input type="checkbox" id="terms-checkbox" onchange="updateTermsAcceptance()">
+                            <label for="terms-checkbox">
+                                I agree to the <a href="#" onclick="openTermsOfService(event)">Terms of Service</a>
+                                and <a href="#" onclick="openPrivacyPolicy(event)">Privacy Policy</a>
+                            </label>
+                        </div>
+
+                        <div class="trial-info">
+                            <span class="trial-badge">FREE TRIAL</span>
+                            <span class="trial-text">1 week free to try TheQuickFox</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 5: Screen Recording + Success -->
+                <div class="panel" data-panel="5">
+                    <div class="panel-content centered">
+                        <!-- Step 1: Explain screen recording -->
+                        <div id="screen-explain-state">
+                            <div class="feature-icon-large">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
                                     <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
                                     <path d="M8 21H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                     <path d="M12 17V21" stroke="currentColor" stroke-width="2"/>
+                                    <circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="2"/>
                                 </svg>
                             </div>
-                            <div class="permission-info">
-                                <h3>Screen Recording</h3>
-                                <p>Lets TheQuickFox see your active window for context</p>
-                            </div>
-                            <button class="permission-btn" id="screen-btn" onclick="grantPermission('screenRecording')">Enable</button>
+                            <h1>One last step</h1>
+                            <p class="subtitle">TheQuickFox needs screen access to see what you're working on and give context-aware responses.</p>
+
+                            <button class="primary-btn" onclick="showScreenInstructions()">Enable Screen Recording</button>
                         </div>
 
-                                            </div>
-                </div>
+                        <!-- Step 2: Show instructions GIF -->
+                        <div id="screen-instructions-state" style="display: none;">
+                            <h1>Grant access in System Settings</h1>
+                            <p class="subtitle">Find TheQuickFox in the list and toggle it on.</p>
 
-                <!-- Panel 5: Final Setup -->
-                <div class="panel" data-panel="5">
-                    <div class="panel-content centered">
-                        <!-- Pre-completion state -->
-                        <div id="setup-state">
-                            <div class="ready-icon">
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
-                                    <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </div>
-                            <h1>Almost there</h1>
-                            <p class="subtitle">One last thing to activate your free trial.</p>
-
-                            <div class="email-form">
-                                <input type="email" id="email-field" placeholder="your@email.com" oninput="updateEmailValidity()">
+                            <div class="permission-demo-gif">
+                                <img src="screen-permissions.gif" alt="How to enable screen recording">
                             </div>
 
-                            <div class="terms-row">
-                                <input type="checkbox" id="terms-checkbox" onchange="updateTermsAcceptance()">
-                                <label for="terms-checkbox">
-                                    I agree to the <a href="#" onclick="openTermsOfService(event)">Terms of Service</a>
-                                    and <a href="#" onclick="openPrivacyPolicy(event)">Privacy Policy</a>
-                                </label>
-                            </div>
+                            <button class="primary-btn" onclick="triggerScreenPermission()">Open System Settings</button>
+                        </div>
 
-                            <div class="trial-info">
-                                <span class="trial-badge">FREE TRIAL</span>
-                                <span class="trial-text">1 week free to try TheQuickFox</span>
+                        <!-- Step 3: Waiting for permission -->
+                        <div id="screen-waiting-state" style="display: none;">
+                            <h1>Waiting for permission...</h1>
+                            <p class="subtitle">Toggle on TheQuickFox in System Settings, then return here.</p>
+
+                            <div class="permission-card granted" id="screen-card">
+                                <div class="permission-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                                        <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M8 21H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        <path d="M12 17V21" stroke="currentColor" stroke-width="2"/>
+                                    </svg>
+                                </div>
+                                <div class="permission-info">
+                                    <h3>Screen Recording</h3>
+                                    <p id="screen-status-text">Checking...</p>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Post-completion state -->
+                        <!-- Step 4: Success -->
                         <div id="success-state" style="display: none;">
                             <div class="success-icon">
                                 <svg width="80" height="80" viewBox="0 0 24 24" fill="none">

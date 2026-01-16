@@ -684,6 +684,36 @@ h1 {
     transform: translateY(-1px);
 }
 
+.feature-icon-large {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    border-radius: 24px;
+    color: white;
+    margin-bottom: 24px;
+}
+
+.primary-btn {
+    padding: 16px 32px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    color: white;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-top: 24px;
+}
+
+.primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
 .email-form {
     margin: 24px 0;
 }
