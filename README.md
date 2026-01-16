@@ -64,4 +64,4 @@ api/                        # Backend API (Elixir/Phoenix)
 
 ## License
 
-[Polyform Shield License 1.0.0](https://polyformproject.org/licenses/shield/1.0.0/) — use, modify, and distribute freely, but not to compete with TheQuickFox.
+[O'Saasy License](https://osaasy.dev/) — use, modify, and distribute freely, but not to offer as a competing SaaS.
